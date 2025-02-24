@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=42.0.0", "wheel>=0.38.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mota"
+version = "0.1.0"
+description = "A Comprehensive LLM API Interaction Tool"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "GPL-3.0-or-later" }
+authors = [
+    {name = "KEJIA", email = "master@renai.com"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = ["AI", "LLM"]
+dependencies = [
+    "typer==0.9.0",
+    "typing-extensions==4.9.0",
+    "edn-format==0.7.5",
+    "requests==2.31.0",
+    "python-dotenv==1.0.1",
+    "anthropic==0.18.1",
+    "google-generativeai==0.3.2",
+    "mistralai==0.0.12",
+    "openai==1.12.0",
+    "pydantic==2.6.1"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==8.0.0",
+    "pytest-cov==4.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[project.urls]
+Repository = "https://github.com/username/mota"
+Documentation = "https://mota.readthedocs.io"
+
+[tool.setuptools.packages.find]
+where = ["source"]
+
+[project.scripts]
+mota = "mota:main"
