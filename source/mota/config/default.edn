@@ -32,6 +32,26 @@
        :temperature 0.7
        :stream true
      }
+     :groq {
+       :model "groq-model"
+       :temperature 0.7
+       :stream true
+     }
+     :grok {
+       :model "grok-model"
+       :temperature 0.7
+       :stream true
+     }
+     :deepseek {
+       :model "deepseek-model"
+       :temperature 0.7
+       :stream true
+     }
+     :openrouter {
+       :model "openrouter-model"
+       :temperature 0.7
+       :stream true
+     }
    }
  }
 }
