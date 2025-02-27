@@ -30,6 +30,8 @@ app = typer.Typer(help="Mota - LLM API Interaction Tool")
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+# 定义 OpenAI 客户端（仅在需要时初始化）
+openai_client = None
 
 def setup_logging(level: str = "INFO", output: str = "stdout") -> None:
     """
@@ -160,7 +162,7 @@ def parse_response(response: Any,
     解析API响应
 
     Args:
-        response (Any): API响应对象
+        response (Any): API响应对象，可以是流式（Stream）或非流式（ChatCompletion）
         custom_parser (Optional[Callable]): 自定义解析函数
 
     Returns:
@@ -171,13 +173,24 @@ def parse_response(response: Any,
 
     # 默认解析逻辑
     try:
-        return {
-            'content': response.choices[0].message.content,
-            'model': response.model,
-            'usage': response.usage._asdict() if hasattr(
-                response,
-                'usage') else {}
-        }
+        # 处理 OpenAI 流式响应
+        if hasattr(response, '__iter__') and not hasattr(response, 'choices'):  # 检查是否为流式响应
+            full_content = ""
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    full_content += chunk.choices[0].delta.content
+            return {
+                'content': full_content,
+                'model': response.model if hasattr(response, 'model') else None,  # 流式响应可能无 model 属性
+                'usage': response.usage._asdict() if hasattr(response, 'usage') else {}
+            }
+        # 处理 OpenAI 非流式响应
+        else:
+            return {
+                'content': response.choices[0].message.content,
+                'model': response.model,
+                'usage': response.usage._asdict() if hasattr(response, 'usage') else {}
+            }
     except Exception as e:
         logger.error(f"解析响应失败: {e}")
         raise
@@ -268,9 +281,11 @@ def main(
         # TODO: 根据提供商实现具体的API调用逻辑
         # 这里以OpenAI为例
         if provider.lower() == "openai":
-            import openai
-            openai.api_key = api_key
-            response = openai.ChatCompletion.create(
+            from openai import OpenAI
+            global openai_client
+            if openai_client is None:
+                openai_client = OpenAI(api_key=api_key)
+            response = openai_client.chat.completions.create(
                 model=request_params["model"],
                 messages=[{"role": "user", "content": formatted_prompt}],
                 temperature=request_params["temperature"],
