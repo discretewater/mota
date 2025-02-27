@@ -18,6 +18,7 @@ import typing
 from typing import Optional, Dict, Any, Callable
 import typer
 import edn_format
+from edn_format import Keyword  # 导入 Keyword
 from pathlib import Path
 from dotenv import dotenv_values
 import keyring  # 用于处理 .authinfo 文件
@@ -203,8 +204,8 @@ def extract_fields(response_dict: Dict[str, Any],
     return extracted
 
 
-@app.command()
-def chat(
+@app.callback(invoke_without_command=True)
+def main(
     provider: str = typer.Option("openai", help="LLM 提供商",
                                  case_sensitive=False,
                                  show_choices=True,
@@ -218,7 +219,7 @@ def chat(
                                  show_envvar=False,
                                  flag_value=None),
     model: Optional[str] = typer.Option(None, help="模型名称", show_default=True),
-    prompt_text: str = typer.Argument(..., help="聊天提示"),
+    prompt: str = typer.Option("万能的专家系统，我需要帮助。", help="聊天提示", show_default=True),
     temperature: float = typer.Option(0.7, help="温度", show_default=True),
     stream: bool = typer.Option(True, help="启用流模式", show_default=True),
     config_path: Optional[str] = typer.Option(None, help="配置文件路径"),
@@ -228,7 +229,7 @@ def chat(
     fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔")
 ) -> None:
     """
-    与LLM进行对话
+    程序入口点，与LLM进行对话
     """
     try:
         # 设置日志
@@ -245,10 +246,10 @@ def chat(
 
         # 配置请求参数
         request_params = {
-            "model": model or config['llm']['providers'][provider.lower()]['model'],
-            "temperature": temperature or config['llm']['temperature'],
-            "stream": stream if 'stream' not in config['llm'] else config['llm']['stream'],
-            "max_tokens": config['llm']['max_tokens']
+            "model": model or config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())][Keyword('model')],
+            "temperature": temperature or config[Keyword('llm')][Keyword('temperature')],
+            "stream": stream if Keyword('stream') not in config[Keyword('llm')] else config[Keyword('llm')][Keyword('stream')],
+            "max_tokens": config[Keyword('llm')][Keyword('max_tokens')]
         }
 
         # 解析自定义参数
@@ -261,7 +262,7 @@ def chat(
         logger.debug(f"最终请求参数: {request_params}")
 
         # 格式化提示词
-        formatted_prompt = format_prompt(prompt_text, **{})
+        formatted_prompt = format_prompt(prompt, **{})
         logger.debug(f"格式化后的提示词: {formatted_prompt}")
 
         # TODO: 根据提供商实现具体的API调用逻辑
@@ -310,12 +311,5 @@ def chat(
         raise typer.Exit(1)
 
 
-def main():
-    """
-    程序入口点
-    """
-    app()
-
-
 if __name__ == "__main__":
-    main()
+    app()
