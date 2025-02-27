@@ -59,4 +59,4 @@ Documentation = "https://mota.readthedocs.io"
 where = ["source"]
 
 [project.scripts]
-mota = "mota.main:main"
+mota = "mota.main:cli"

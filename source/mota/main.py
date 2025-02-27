@@ -25,7 +25,7 @@ import keyring  # 用于处理 .authinfo 文件
 import gnupg  # 用于处理加密的 .authinfo.gpg
 
 # Initialize typer app
-app = typer.Typer(help="Mota - LLM API Interaction Tool")
+cli = typer.Typer(help="Mota - LLM API Interaction Tool")
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -217,7 +217,7 @@ def extract_fields(response_dict: Dict[str, Any],
     return extracted
 
 
-@app.callback(invoke_without_command=True)
+@cli.callback(invoke_without_command=True)
 def main(
     provider: str = typer.Option("openai", help="LLM 提供商",
                                  case_sensitive=False,
@@ -246,6 +246,7 @@ def main(
     """
     try:
         # 设置日志
+        print(".............. >>> ", log_level)
         setup_logging(log_level, log_output)
         logger.debug("日志系统已初始化")
 
@@ -327,4 +328,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    cli()
