@@ -37,7 +37,8 @@ dependencies = [
     "openai>=1.64.0",
     "pydantic~=2.10.6",
     "keyring~=25.6.0",
-    "python-gnupg~=0.5.4"
+    "python-gnupg~=0.5.4",
+		"groq>=0.18.0"
 ]
 
 [project.optional-dependencies]

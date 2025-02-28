@@ -15,7 +15,7 @@ import os
 import sys
 import logging
 import typing
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 import typer
 import edn_format
 from edn_format import Keyword  # 导入 Keyword
@@ -25,7 +25,7 @@ import keyring  # 用于处理 .authinfo 文件
 import gnupg  # 用于处理加密的 .authinfo.gpg
 
 # Initialize typer app
-cli = typer.Typer(help="Mota - LLM API Interaction Tool")
+cli = typer.Typer(help="Mota - LLM API Interaction Tool", add_completion=False)
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -217,7 +217,138 @@ def extract_fields(response_dict: Dict[str, Any],
     return extracted
 
 
-@cli.callback(invoke_without_command=True)
+# 新增统一 LLM API 调用函数及自定义调用函数支持
+
+def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request_params: Dict[str, Any]) -> Any:
+    """
+    默认的 LLM API 调用函数，根据提供商名称调用相应的 LLM API.
+    
+    支持基于配置参数实现各主流 LLM API 的调用，包括 openai 和 anthropic.
+    也可扩展支持其他 LLM 提供商。
+    
+    Args:
+        provider (str): LLM 提供商名称，如 "openai", "anthropic" 等。
+        api_key (str): API 认证密钥。
+        formatted_prompt (str): 格式化后的提示词。
+        request_params (Dict[str, Any]): 请求参数，包括模型名称、温度、流模式、最大 token 数等。
+    
+    Returns:
+        Any: LLM API 的响应对象。
+    
+    Raises:
+        NotImplementedError: 当指定提供商的调用逻辑未实现时。
+    """
+    provider_lower = provider.lower()
+    if provider_lower == "openai":
+        from openai import OpenAI
+        global openai_client
+        if openai_client is None:
+            openai_client = OpenAI(api_key=api_key)
+            
+        # 构建消息列表
+        messages = [{"role": "system", "content": formatted_prompt}]
+        
+        # 如果有用户消息，添加到消息列表中
+        user_message = request_params.get("message")
+        if user_message:
+            messages.append({"role": "user", "content": user_message})
+        else:
+            # 如果没有用户消息，添加一个默认的用户消息
+            messages.append({"role": "user", "content": "请根据上述提示进行回答"})
+            
+        return openai_client.chat.completions.create(
+            model=request_params["model"],
+            messages=messages,
+            temperature=request_params["temperature"],
+            stream=request_params["stream"],
+            max_tokens=request_params["max_tokens"]
+        )
+    elif provider_lower == "anthropic":
+        import anthropic
+        client = anthropic.Client(api_key)
+        
+        # 构建 Anthropic 的提示词格式
+        # 注意：Anthropic 的 API 可能需要特定的提示词格式
+        system_prompt = formatted_prompt
+        user_message = request_params.get("message", "请根据上述提示进行回答")
+        
+        # 使用 Claude 消息 API
+        try:
+            return client.messages.create(
+                model=request_params["model"],
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+                temperature=request_params["temperature"],
+                max_tokens=request_params["max_tokens"]
+            )
+        except (AttributeError, TypeError):
+            # 如果新版 API 不可用，回退到旧版 API
+            return client.completion(
+                prompt=f"{system_prompt}\n\nHuman: {user_message}\n\nAssistant:",
+                model=request_params["model"],
+                temperature=request_params["temperature"],
+                stop_sequences=["\n\nHuman:"],
+                max_tokens_to_sample=request_params["max_tokens"]
+            )
+    # 添加 GROQ 支持
+    elif provider_lower == "groq":
+        # 导入自定义 GROQ 模块
+        try:
+            import importlib.util
+            groq_spec = importlib.util.spec_from_file_location(
+                "custom_groq", 
+                os.path.join(os.path.dirname(__file__), "custom_groq.py")
+            )
+            custom_groq = importlib.util.module_from_spec(groq_spec)
+            groq_spec.loader.exec_module(custom_groq)
+            
+            # 调用自定义 GROQ API 函数
+            return custom_groq.call_groq_api(provider, api_key, formatted_prompt, request_params)
+        except Exception as e:
+            logger.error(f"调用 GROQ API 失败: {e}")
+            raise
+    
+    # 添加其他默认支持的 LLM 提供商调用逻辑，此处可根据需求扩展
+    else:
+        logger.error(f"尚未实现 {provider} 提供商的API调用逻辑")
+        raise NotImplementedError(f"{provider} 提供商的API调用逻辑未实现")
+
+
+def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
+    """
+    获取 LLM API 调用函数.
+    
+    如果用户提供了自定义的 LLM API 调用函数路径，则导入该函数。
+    否则，使用默认的 LLM API 调用函数。
+    
+    Args:
+        custom_caller (Optional[str]): 用户自定义函数路径，格式为 "模块名:函数名"。
+    
+    Returns:
+        Callable: 用于调用 LLM API 的函数。
+    
+    Raises:
+        Exception: 当自定义函数导入失败时。
+    """
+    if custom_caller:
+        import importlib
+        try:
+            module_name, func_name = custom_caller.split(":")
+            mod = importlib.import_module(module_name)
+            func = getattr(mod, func_name)
+            logger.debug(f"使用用户自定义 LLM 调用函数: {custom_caller}")
+            return func
+        except Exception as e:
+            logger.error(f"加载用户自定义 LLM 调用函数失败: {e}")
+            raise
+    else:
+        return default_llm_call
+
+
+# 创建一个不使用子命令的 Typer 应用
+cli = typer.Typer(help="Mota - LLM API Interaction Tool", add_completion=False)
+
+@cli.command()
 def main(
     provider: str = typer.Option("openai", help="LLM 提供商",
                                  case_sensitive=False,
@@ -232,23 +363,37 @@ def main(
                                  show_envvar=False,
                                  flag_value=None),
     model: Optional[str] = typer.Option(None, help="模型名称", show_default=True),
-    prompt: str = typer.Option("万能的专家系统，我需要帮助。", help="聊天提示", show_default=True),
+    prompt: str = typer.Option("万能的专家系统，我需要帮助。", help="系统提示词", show_default=True),
+    message: Optional[str] = typer.Option(None, help="用户消息", show_default=True),
     temperature: float = typer.Option(0.7, help="温度", show_default=True),
     stream: bool = typer.Option(True, help="启用流模式", show_default=True),
     config_path: Optional[str] = typer.Option(None, help="配置文件路径"),
     log_level: str = typer.Option("INFO", help="日志级别", show_default=True),
     log_output: str = typer.Option("stdout", help="日志输出目标", show_default=True),
     custom_params: Optional[str] = typer.Option(None, help="自定义聊天请求参数，使用JSON格式"),
-    fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔")
+    fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔"),
+    custom_caller: Optional[str] = typer.Option(None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
+    user_query: Optional[List[str]] = typer.Argument(None, help="用户查询")
 ) -> None:
     """
     程序入口点，与LLM进行对话
     """
     try:
         # 设置日志
-        print(".............. >>> ", log_level)
         setup_logging(log_level, log_output)
         logger.debug("日志系统已初始化")
+
+        # 处理用户查询参数作为用户消息
+        actual_user_message = message
+        
+        if user_query:
+            logger.debug(f"检测到用户查询参数: {user_query}")
+            # 如果已经有用户消息，则将用户查询添加到用户消息后面
+            if actual_user_message:
+                actual_user_message = f"{actual_user_message} {' '.join(user_query)}"
+            else:
+                actual_user_message = ' '.join(user_query)
+            logger.debug(f"合并后的用户消息: {actual_user_message}")
 
         # 加载配置
         config = load_config(config_path)
@@ -263,7 +408,8 @@ def main(
             "model": model or config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())][Keyword('model')],
             "temperature": temperature or config[Keyword('llm')][Keyword('temperature')],
             "stream": stream if Keyword('stream') not in config[Keyword('llm')] else config[Keyword('llm')][Keyword('stream')],
-            "max_tokens": config[Keyword('llm')][Keyword('max_tokens')]
+            "max_tokens": config[Keyword('llm')][Keyword('max_tokens')],
+            "message": actual_user_message  # 添加用户消息参数
         }
 
         # 解析自定义参数
@@ -279,34 +425,9 @@ def main(
         formatted_prompt = format_prompt(prompt, **{})
         logger.debug(f"格式化后的提示词: {formatted_prompt}")
 
-        # TODO: 根据提供商实现具体的API调用逻辑
-        # 这里以OpenAI为例
-        if provider.lower() == "openai":
-            from openai import OpenAI
-            global openai_client
-            if openai_client is None:
-                openai_client = OpenAI(api_key=api_key)
-            response = openai_client.chat.completions.create(
-                model=request_params["model"],
-                messages=[{"role": "user", "content": formatted_prompt}],
-                temperature=request_params["temperature"],
-                stream=request_params["stream"],
-                max_tokens=request_params["max_tokens"]
-            )
-        elif provider.lower() == "anthropic":
-            import anthropic
-            client = anthropic.Client(api_key)
-            response = client.completion(
-                prompt=formatted_prompt,
-                model=request_params["model"],
-                temperature=request_params["temperature"],
-                stop_sequences=["\n"],
-                max_tokens_to_sample=request_params["max_tokens"]
-            )
-        # TODO: 添加其他提供商的API调用逻辑
-        else:
-            logger.error(f"尚未实现 {provider} 提供商的API调用逻辑")
-            raise NotImplementedError(f"{provider} 提供商的API调用逻辑未实现")
+        # 调用 LLM API 的统一接口函数，根据配置参数和自定义函数实现调用逻辑
+        llm_call_func = get_llm_call_func(custom_caller)
+        response = llm_call_func(provider, api_key, formatted_prompt, request_params)
 
         logger.debug(f"API响应: {response}")
 
