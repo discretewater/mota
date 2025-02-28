@@ -9,6 +9,8 @@ import logging
 from collections.abc import Mapping
 from edn_format import Keyword
 from unittest.mock import patch, MagicMock, mock_open
+import json
+
 from mota.main import (
     setup_logging,
     load_config,
@@ -114,3 +116,146 @@ def test_extract_fields():
     assert extracted == {
         "content": "Test content"
     }
+
+
+# 新增针对主要功能的测试用例（仅针对OpenAI ChatGPT API模拟）
+
+from typer.testing import CliRunner
+
+# 定义一个假的OpenAI API响应对象
+class FakeUsage:
+    def _asdict(self):
+        return {"total_tokens": 50}
+
+
+class FakeChoice:
+    class FakeMessage:
+        content = "Fake response from OpenAI"
+    message = FakeMessage()
+
+
+class FakeOpenAIResponse:
+    choices = [FakeChoice()]
+    model = "gpt-4"
+    usage = FakeUsage()
+
+
+# 定义一个简单的dummy配置，用于模拟load_config返回的配置字典
+dummy_config = {
+    Keyword("logging"): {"level": "DEBUG"},
+    Keyword("llm"): {
+        Keyword("providers"): {
+            Keyword("openai"): {
+                Keyword("model"): "gpt-4"
+            }
+        },
+        Keyword("temperature"): 0.7,
+        Keyword("stream"): True,
+        Keyword("max_tokens"): 1000
+    }
+}
+
+
+@patch("mota.main.load_config", return_value=dummy_config)
+@patch("mota.main.get_api_key", return_value="dummy_api_key")
+@patch("openai.OpenAI")
+def test_main_openai_success(mock_openai_cls, mock_get_api_key, mock_load_config):
+    """
+    测试 main 函数在 openai 提供商下的成功执行。
+    使用 mock 模拟 OpenAI API响应，并验证输出结果包含预期响应内容。
+    """
+    # 重置全局 openai_client 以确保测试隔离
+    import mota.main as main_mod
+    main_mod.openai_client = None
+
+    # 构造假的 OpenAI 客户端实例及其响应
+    fake_client_instance = MagicMock()
+    fake_chat = MagicMock()
+    fake_completions = MagicMock(return_value=FakeOpenAIResponse())
+    fake_chat.completions.create = fake_completions
+    fake_client_instance.chat = fake_chat
+    mock_openai_cls.return_value = fake_client_instance
+
+    from mota.main import cli
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "--log-level", "DEBUG",
+        "--provider", "openai",
+        "--model", "gpt-4",
+        "--prompt", "Test prompt"
+    ])
+    # 验证输出中包含模拟的响应内容
+    assert "Fake response from OpenAI" in result.output
+
+
+@patch("mota.main.load_config", return_value=dummy_config)
+@patch("mota.main.get_api_key", return_value="dummy_api_key")
+@patch("openai.OpenAI")
+def test_main_openai_custom_params(mock_openai_cls, mock_get_api_key, mock_load_config):
+    """
+    测试 main 函数使用自定义请求参数执行，
+    验证自定义参数是否正确合并到API请求中。
+    """
+    # 重置全局 openai_client 以确保测试隔离
+    import mota.main as main_mod
+    main_mod.openai_client = None
+
+    fake_client_instance = MagicMock()
+    fake_chat = MagicMock()
+    fake_completions = MagicMock(return_value=FakeOpenAIResponse())
+    fake_chat.completions.create = fake_completions
+    fake_client_instance.chat = fake_chat
+    mock_openai_cls.return_value = fake_client_instance
+
+    from mota.main import cli
+    runner = CliRunner()
+    # 定义自定义参数，覆盖默认的temperature值
+    custom_params = json.dumps({"temperature": 0.9})
+    result = runner.invoke(cli, [
+        "--log-level", "DEBUG",
+        "--provider", "openai",
+        "--model", "gpt-4",
+        "--prompt", "Test prompt",
+        "--custom-params", custom_params
+    ])
+    # 验证 API 调用中使用的参数包含自定义值
+    fake_completions.assert_called_once()
+    called_args, called_kwargs = fake_completions.call_args
+    assert called_kwargs.get("temperature") == 0.9
+    assert "Fake response from OpenAI" in result.output
+
+
+@patch("mota.main.load_config", return_value=dummy_config)
+@patch("mota.main.get_api_key", return_value="dummy_api_key")
+@patch("openai.OpenAI")
+def test_main_openai_field_extraction(mock_openai_cls, mock_get_api_key, mock_load_config):
+    """
+    测试 main 函数的字段提取功能，
+    当使用 --fields 参数时，输出应只包含指定的字段。
+    """
+    # 重置全局 openai_client 以确保测试隔离
+    import mota.main as main_mod
+    main_mod.openai_client = None
+
+    fake_client_instance = MagicMock()
+    fake_chat = MagicMock()
+    fake_completions = MagicMock(return_value=FakeOpenAIResponse())
+    fake_chat.completions.create = fake_completions
+    fake_client_instance.chat = fake_chat
+    mock_openai_cls.return_value = fake_client_instance
+
+    from mota.main import cli
+    runner = CliRunner()
+    # 请求只提取 'content' 字段
+    result = runner.invoke(cli, [
+        "--log-level", "DEBUG",
+        "--provider", "openai",
+        "--model", "gpt-4",
+        "--prompt", "Test prompt",
+        "--fields", "content"
+    ])
+    # 从输出中取最后一行（假定为打印的字典）进行断言，忽略调试日志的干扰
+    output_lines = result.output.strip().splitlines()
+    printed_dict_line = output_lines[-1]
+    assert "Fake response from OpenAI" in result.output
+    assert "'content':" in printed_dict_line and "'model':" not in printed_dict_line
