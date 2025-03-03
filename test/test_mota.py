@@ -182,7 +182,8 @@ def test_main_openai_success(mock_openai_cls, mock_get_api_key, mock_load_config
         "--log-level", "DEBUG",
         "--provider", "openai",
         "--model", "gpt-4",
-        "--prompt", "Test prompt"
+        "--prompt", "Test prompt",
+        "Test message"  # 添加必需的 MESSAGE 参数
     ])
     # 验证输出中包含模拟的响应内容
     assert "Fake response from OpenAI" in result.output
@@ -216,10 +217,14 @@ def test_main_openai_custom_params(mock_openai_cls, mock_get_api_key, mock_load_
         "--provider", "openai",
         "--model", "gpt-4",
         "--prompt", "Test prompt",
-        "--custom-params", custom_params
+        "--custom-params", custom_params,
+        "Test message"  # 添加必需的 MESSAGE 参数
     ])
     # 验证 API 调用中使用的参数包含自定义值
     fake_completions.assert_called_once()
+    called_args, called_kwargs = fake_completions.call_args
+    assert called_kwargs.get("temperature") == 0.9
+    assert "Fake response from OpenAI" in result.output
     called_args, called_kwargs = fake_completions.call_args
     assert called_kwargs.get("temperature") == 0.9
     assert "Fake response from OpenAI" in result.output
@@ -252,10 +257,11 @@ def test_main_openai_field_extraction(mock_openai_cls, mock_get_api_key, mock_lo
         "--provider", "openai",
         "--model", "gpt-4",
         "--prompt", "Test prompt",
-        "--fields", "content"
+        "--fields", "content",
+        "Test message"  # 添加必需的 MESSAGE 参数
     ])
     # 从输出中取最后一行（假定为打印的字典）进行断言，忽略调试日志的干扰
     output_lines = result.output.strip().splitlines()
-    printed_dict_line = output_lines[-1]
+    printed_dict_line = output_lines[-1] if output_lines else ""
     assert "Fake response from OpenAI" in result.output
     assert "'content':" in printed_dict_line and "'model':" not in printed_dict_line
