@@ -286,24 +286,6 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
                 stop_sequences=["\n\nHuman:"],
                 max_tokens_to_sample=request_params["max_tokens"]
             )
-    # 添加 GROQ 支持
-    elif provider_lower == "groq":
-        # 导入自定义 GROQ 模块
-        try:
-            import importlib.util
-            groq_spec = importlib.util.spec_from_file_location(
-                "custom_groq", 
-                os.path.join(os.path.dirname(__file__), "custom_groq.py")
-            )
-            custom_groq = importlib.util.module_from_spec(groq_spec)
-            groq_spec.loader.exec_module(custom_groq)
-            
-            # 调用自定义 GROQ API 函数
-            return custom_groq.call_groq_api(provider, api_key, formatted_prompt, request_params)
-        except Exception as e:
-            logger.error(f"调用 GROQ API 失败: {e}")
-            raise
-    
     # 添加其他默认支持的 LLM 提供商调用逻辑，此处可根据需求扩展
     else:
         logger.error(f"尚未实现 {provider} 提供商的API调用逻辑")
