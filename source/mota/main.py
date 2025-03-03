@@ -248,13 +248,9 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
         # 构建消息列表
         messages = [{"role": "system", "content": formatted_prompt}]
         
-        # 如果有用户消息，添加到消息列表中
+        # 添加用户消息到消息列表中
         user_message = request_params.get("message")
-        if user_message:
-            messages.append({"role": "user", "content": user_message})
-        else:
-            # 如果没有用户消息，添加一个默认的用户消息
-            messages.append({"role": "user", "content": "请根据上述提示进行回答"})
+        messages.append({"role": "user", "content": user_message})
             
         return openai_client.chat.completions.create(
             model=request_params["model"],
@@ -270,7 +266,7 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
         # 构建 Anthropic 的提示词格式
         # 注意：Anthropic 的 API 可能需要特定的提示词格式
         system_prompt = formatted_prompt
-        user_message = request_params.get("message", "请根据上述提示进行回答")
+        user_message = request_params.get("message")
         
         # 使用 Claude 消息 API
         try:
@@ -350,6 +346,7 @@ cli = typer.Typer(help="Mota - LLM API Interaction Tool", add_completion=False)
 
 @cli.command()
 def main(
+    # 必选参数
     provider: str = typer.Option("openai", help="LLM 提供商",
                                  case_sensitive=False,
                                  show_choices=True,
@@ -364,7 +361,7 @@ def main(
                                  flag_value=None),
     model: Optional[str] = typer.Option(None, help="模型名称", show_default=True),
     prompt: str = typer.Option("万能的专家系统，我需要帮助。", help="系统提示词", show_default=True),
-    message: Optional[str] = typer.Option(None, help="用户消息", show_default=True),
+    message: str = typer.Argument(..., help="用户消息 (必选参数)"),
     temperature: float = typer.Option(0.7, help="温度", show_default=True),
     stream: bool = typer.Option(True, help="启用流模式", show_default=True),
     config_path: Optional[str] = typer.Option(None, help="配置文件路径"),
@@ -373,7 +370,7 @@ def main(
     custom_params: Optional[str] = typer.Option(None, help="自定义聊天请求参数，使用JSON格式"),
     fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔"),
     custom_caller: Optional[str] = typer.Option(None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
-    user_query: Optional[List[str]] = typer.Argument(None, help="用户查询")
+    user_query: Optional[List[str]] = typer.Argument(None, help="附加的用户查询，将会附加到主要用户消息后")
 ) -> None:
     """
     程序入口点，与LLM进行对话
@@ -388,11 +385,8 @@ def main(
         
         if user_query:
             logger.debug(f"检测到用户查询参数: {user_query}")
-            # 如果已经有用户消息，则将用户查询添加到用户消息后面
-            if actual_user_message:
-                actual_user_message = f"{actual_user_message} {' '.join(user_query)}"
-            else:
-                actual_user_message = ' '.join(user_query)
+            # 将用户查询添加到用户消息后面
+            actual_user_message = f"{actual_user_message} {' '.join(user_query)}"
             logger.debug(f"合并后的用户消息: {actual_user_message}")
 
         # 加载配置

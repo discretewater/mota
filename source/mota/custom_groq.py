@@ -41,10 +41,10 @@ def call_groq_api(provider: str, api_key: str, formatted_prompt: str, request_pa
     
     # 从请求参数中提取参数并设置适当的默认值
     model = request_params.get("model", "deepseek-r1-distill-llama-70b")
-    temperature = request_params.get("temperature", 0.7)
-    max_completion_tokens = request_params.get("max_tokens", 1024)  # 兼容性处理
-    stream = request_params.get("stream", False)
-    top_p = request_params.get("top_p", 0.95)
+    temperature = request_params.get("temperature", 1.236)
+    max_completion_tokens = request_params.get("max_tokens", 1266)
+    stream = request_params.get("stream", True)
+    top_p = request_params.get("top_p", 0.62)
     stop = request_params.get("stop", None)
     user_message = request_params.get("message", "")
     
