@@ -352,6 +352,7 @@ def main(
     custom_params: Optional[str] = typer.Option(None, help="自定义聊天请求参数，使用JSON格式"),
     fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔"),
     custom_caller: Optional[str] = typer.Option(None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
+    custom_parser: Optional[str] = typer.Option(None, help="自定义响应解析函数路径，格式为 模块名:函数名", show_default=False),
     user_query: Optional[List[str]] = typer.Argument(None, help="附加的用户查询，将会附加到主要用户消息后")
 ) -> None:
     """
@@ -407,8 +408,11 @@ def main(
 
         logger.debug(f"API响应: {response}")
 
+        # 获取自定义解析器
+        custom_parser_func = get_llm_call_func(custom_parser) if custom_parser else None
+        
         # 解析响应
-        parsed_response = parse_response(response)
+        parsed_response = parse_response(response, custom_parser=custom_parser_func)
         logger.debug(f"解析后的响应: {parsed_response}")
 
         # 提取指定字段

@@ -95,3 +95,57 @@ def call_groq_api(provider: str, api_key: str, formatted_prompt: str, request_pa
             return {"mock": "response"}
         else:
             raise Exception(f"GROQ API 调用失败: {e}")
+def parse_groq_response(response: Any) -> Dict[str, Any]:
+    """
+    解析GROQ API响应的自定义函数
+    
+    参数:
+        response (Any): GROQ API的响应对象，可以是流式或非流式响应
+            - 流式响应: 包含多个chunk的生成器对象
+            - 非流式响应: 单个ChatCompletion对象
+        
+    返回:
+        Dict[str, Any]: 包含解析内容的字典，包含以下字段:
+            - content (str): 完整的响应内容
+            - model (str): 使用的模型名称
+            - usage (dict): API使用统计信息（如果存在）
+            
+    异常:
+        抛出原始异常并记录错误日志
+        
+    示例:
+        >>> parse_groq_response(stream_response)
+        {'content': '...', 'model': 'llama2-70b', 'usage': {'total_tokens': 100}}
+    """
+    try:
+        # 处理流式响应
+        if hasattr(response, '__iter__') and not hasattr(response, 'choices'):
+            full_content = ""
+            model = ""
+            usage = {}
+            for chunk in response:
+                if hasattr(chunk, 'choices') and chunk.choices:
+                    delta = chunk.choices[0].delta
+                    if delta and delta.content:
+                        full_content += delta.content
+                if not model and hasattr(chunk, 'model'):
+                    model = chunk.model
+                # 累积usage统计信息（流式响应中每个chunk可能有部分统计）
+                if hasattr(chunk, 'usage') and chunk.usage:
+                    chunk_usage = chunk.usage._asdict()
+                    usage = {k: chunk_usage.get(k, 0) + usage.get(k, 0) for k in set(chunk_usage) | set(usage)}
+            return {
+                'content': full_content,
+                'model': model,
+                'usage': usage
+            }
+        # 处理非流式响应
+        else:
+            return {
+                'content': response.choices[0].message.content,
+                'model': response.model,
+                'usage': response.usage._asdict() if (hasattr(response, 'usage') and response.usage) else {}
+            }
+    except Exception as e:
+        logger.error(f"解析GROQ响应失败: {e}")
+        raise
