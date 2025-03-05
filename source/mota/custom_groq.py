@@ -10,6 +10,7 @@ custom_groq.py - GROQ API 调用模块
 import logging
 from typing import Any, Dict, Generator, Union
 from groq import Groq
+from unittest.mock import MagicMock
 
 # 初始化日志记录器
 logger = logging.getLogger(__name__)
@@ -38,12 +39,7 @@ def call_groq_api(provider: str, api_key: str, formatted_prompt: str, request_pa
     """
     # 使用提供的 API 密钥初始化 GROQ 客户端
     # 注意：在测试环境中，client 可能已经被 mock 替换
-    try:
-        from groq import Groq
-        client = Groq(api_key=api_key)
-    except ImportError:
-        logger.warning("Groq 库未安装，无法初始化客户端")
-        raise
+    client = Groq(api_key=api_key)
     
     # 从请求参数中提取参数并设置适当的默认值
     model = request_params.get("model", "deepseek-r1-distill-llama-70b")
@@ -89,12 +85,7 @@ def call_groq_api(provider: str, api_key: str, formatted_prompt: str, request_pa
     except Exception as e:
         # 记录并重新引发 API 调用期间发生的任何异常
         logger.error(f"GROQ API 调用失败: {e}")
-        # 在测试环境中，我们不希望真正抛出异常
-        if "test-api-key" in api_key:
-            logger.info("检测到测试环境，返回模拟响应")
-            return {"mock": "response"}
-        else:
-            raise Exception(f"GROQ API 调用失败: {e}")
+        raise
 def parse_groq_response(response: Any) -> Dict[str, Any]:
     """
     解析GROQ API响应的自定义函数

@@ -169,3 +169,84 @@ def test_custom_groq_api_without_user_message(stream_mode):
             stream=params["stream"],
             stop=None
         )
+
+
+class MockStreamChunk:
+    """模拟GROQ流式响应块"""
+    def __init__(self, content="", model=None, usage=None):
+        self.choices = [MagicMock(delta=MagicMock(content=content))]
+        self.model = model
+        self.usage = usage
+
+class MockCompletion:
+    """模拟GROQ非流式响应"""
+    def __init__(self, content="test content", model="test-model", usage=None):
+        self.choices = [MagicMock(message=MagicMock(content=content))]
+        self.model = model
+        self.usage = usage
+
+def test_parse_groq_response_non_stream():
+    """测试解析非流式响应"""
+    # 导入自定义 GROQ 模块
+    groq_spec = importlib.util.spec_from_file_location(
+        "custom_groq", 
+        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
+    )
+    custom_groq = importlib.util.module_from_spec(groq_spec)
+    groq_spec.loader.exec_module(custom_groq)
+
+    mock_usage = MagicMock()
+    mock_usage._asdict.return_value = {"total_tokens": 100}
+    response = MockCompletion(usage=mock_usage)
+    
+    result = custom_groq.parse_groq_response(response)
+    
+    assert result["content"] == "test content"
+    assert result["model"] == "test-model"
+    assert result["usage"]["total_tokens"] == 100
+
+def test_parse_groq_response_stream():
+    """测试解析流式响应"""
+    # 导入自定义 GROQ 模块
+    groq_spec = importlib.util.spec_from_file_location(
+        "custom_groq", 
+        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
+    )
+    custom_groq = importlib.util.module_from_spec(groq_spec)
+    groq_spec.loader.exec_module(custom_groq)
+
+    chunks = [
+        MockStreamChunk(content="Hello", model="llama2-70b", 
+                      usage=MagicMock(_asdict=lambda: {"total_tokens": 50})),
+        MockStreamChunk(content=" World", 
+                      usage=MagicMock(_asdict=lambda: {"total_tokens": 75})),
+        MockStreamChunk(content="!", 
+                      usage=MagicMock(_asdict=lambda: {"total_tokens": 100}))
+    ]
+    
+    result = custom_groq.parse_groq_response(iter(chunks))
+    
+    assert result["content"] == "Hello World!"
+    assert result["model"] == "llama2-70b"
+    assert result["usage"]["total_tokens"] == 225  # 50 + 75 + 100
+
+def test_parse_groq_response_error_handling(caplog):
+    """测试异常处理"""
+    # 导入自定义 GROQ 模块
+    groq_spec = importlib.util.spec_from_file_location(
+        "custom_groq", 
+        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
+    )
+    custom_groq = importlib.util.module_from_spec(groq_spec)
+    groq_spec.loader.exec_module(custom_groq)
+
+    # 创建一个会引发异常的无效响应对象
+    invalid_response = MagicMock(spec=dict)  # 指定错误的类型规范
+    # 添加会通过初始检查但后续处理会失败的属性
+    invalid_response.__iter__ = lambda self: iter([self])
+    invalid_response.choices = []  # 空choices列表会引发索引错误
+    
+    with pytest.raises(Exception):
+        custom_groq.parse_groq_response(invalid_response)
+    
+    assert "解析GROQ响应失败" in caplog.text
