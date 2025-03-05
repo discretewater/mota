@@ -92,8 +92,9 @@ def test_custom_groq_api(stream_mode):
             "message": "Hello, GROQ!"  # 用户消息
         }
         
-        # 调用函数
-        custom_groq.call_groq_api(provider, api_key, prompt, params)
+        # 调用函数 - 使用类实例调用
+        groq_caller = custom_groq.GroqLLMCaller()
+        groq_caller(provider, api_key, prompt, params)
         
         # 验证 Groq 客户端是否使用正确的 API 密钥初始化
         mock_groq.assert_called_once_with(api_key=api_key)
@@ -113,6 +114,15 @@ def test_custom_groq_api(stream_mode):
             stream=params["stream"],
             stop=None
         )
+        
+        # 测试向后兼容性 - 使用函数别名
+        mock_groq.reset_mock()
+        mock_completions.reset_mock()
+        custom_groq.call_groq_api(provider, api_key, prompt, params)
+        
+        # 验证函数别名是否正常工作
+        mock_groq.assert_called_once_with(api_key=api_key)
+        mock_completions.assert_called_once()
 
 
 @pytest.mark.parametrize("stream_mode", [True, False])
@@ -150,8 +160,9 @@ def test_custom_groq_api_without_user_message(stream_mode):
             # 没有 message 参数
         }
         
-        # 调用函数
-        custom_groq.call_groq_api(provider, api_key, prompt, params)
+        # 使用类实例测试
+        groq_caller = custom_groq.GroqLLMCaller()
+        groq_caller(provider, api_key, prompt, params)
         
         # 验证 completions.create 是否使用正确的参数调用
         # 应该有系统消息和默认用户消息
@@ -159,6 +170,21 @@ def test_custom_groq_api_without_user_message(stream_mode):
             {"role": "system", "content": prompt},
             {"role": "user", "content": "请根据上述提示进行回答"}
         ]
+        
+        mock_completions.assert_called_once_with(
+            model=params["model"],
+            messages=expected_messages,
+            temperature=params["temperature"],
+            max_completion_tokens=params["max_tokens"],
+            top_p=params["top_p"],
+            stream=params["stream"],
+            stop=None
+        )
+        
+        # 测试向后兼容性 - 使用函数别名
+        mock_groq.reset_mock()
+        mock_completions.reset_mock()
+        custom_groq.call_groq_api(provider, api_key, prompt, params)
         
         mock_completions.assert_called_once_with(
             model=params["model"],
@@ -199,6 +225,15 @@ def test_parse_groq_response_non_stream():
     mock_usage._asdict.return_value = {"total_tokens": 100}
     response = MockCompletion(usage=mock_usage)
     
+    # 使用类实例测试
+    parser = custom_groq.GroqResponseParser()
+    result = parser(response)
+    
+    assert result["content"] == "test content"
+    assert result["model"] == "test-model"
+    assert result["usage"]["total_tokens"] == 100
+    
+    # 测试向后兼容性 - 使用函数别名
     result = custom_groq.parse_groq_response(response)
     
     assert result["content"] == "test content"
@@ -224,6 +259,15 @@ def test_parse_groq_response_stream():
                       usage=MagicMock(_asdict=lambda: {"total_tokens": 100}))
     ]
     
+    # 使用类实例测试
+    parser = custom_groq.GroqResponseParser()
+    result = parser(iter(chunks))
+    
+    assert result["content"] == "Hello World!"
+    assert result["model"] == "llama2-70b"
+    assert result["usage"]["total_tokens"] == 225  # 50 + 75 + 100
+    
+    # 测试向后兼容性 - 使用函数别名
     result = custom_groq.parse_groq_response(iter(chunks))
     
     assert result["content"] == "Hello World!"
@@ -246,7 +290,43 @@ def test_parse_groq_response_error_handling(caplog):
     invalid_response.__iter__ = lambda self: iter([self])
     invalid_response.choices = []  # 空choices列表会引发索引错误
     
+    # 使用类实例测试
+    parser = custom_groq.GroqResponseParser()
+    with pytest.raises(Exception):
+        parser(invalid_response)
+    
+    assert "解析GROQ响应失败" in caplog.text
+    
+    # 测试向后兼容性 - 使用函数别名
+    caplog.clear()
     with pytest.raises(Exception):
         custom_groq.parse_groq_response(invalid_response)
     
     assert "解析GROQ响应失败" in caplog.text
+def test_interface_implementation():
+    """测试接口实现"""
+    # 导入自定义 GROQ 模块和接口
+    groq_spec = importlib.util.spec_from_file_location(
+        "custom_groq", 
+        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
+    )
+    custom_groq = importlib.util.module_from_spec(groq_spec)
+    groq_spec.loader.exec_module(custom_groq)
+    
+    interface_spec = importlib.util.spec_from_file_location(
+        "custom_interface", 
+        os.path.join(os.path.dirname(__file__), "../source/mota/custom_interface.py")
+    )
+    custom_interface = importlib.util.module_from_spec(interface_spec)
+    interface_spec.loader.exec_module(custom_interface)
+    
+    # 验证类是否实现了接口
+    groq_caller = custom_groq.GroqLLMCaller()
+    groq_parser = custom_groq.GroqResponseParser()
+    
+    assert isinstance(groq_caller, custom_interface.LLMCallerInterface)
+    assert isinstance(groq_parser, custom_interface.ResponseParserInterface)
+    
+    # 验证函数别名是否实现了接口
+    assert isinstance(custom_groq.call_groq_api, custom_interface.LLMCallerInterface)
+    assert isinstance(custom_groq.parse_groq_response, custom_interface.ResponseParserInterface)

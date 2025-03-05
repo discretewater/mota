@@ -169,6 +169,11 @@ def parse_response(response: Any,
         Dict[str, Any]: 解析后的响应内容
     """
     if custom_parser:
+        # 检查是否符合接口要求
+        from mota.custom_interface import ResponseParserInterface
+        if not isinstance(custom_parser, ResponseParserInterface):
+            logger.warning(f"自定义解析器未实现 ResponseParserInterface 接口")
+            
         return custom_parser(response)
 
     # 默认解析逻辑
@@ -315,6 +320,12 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
             mod = importlib.import_module(module_name)
             func = getattr(mod, func_name)
             logger.debug(f"使用用户自定义 LLM 调用函数: {custom_caller}")
+            
+            # 检查是否符合接口要求
+            from mota.custom_interface import LLMCallerInterface
+            if not isinstance(func, LLMCallerInterface):
+                logger.warning(f"自定义函数 {custom_caller} 未实现 LLMCallerInterface 接口")
+                
             return func
         except Exception as e:
             logger.error(f"加载用户自定义 LLM 调用函数失败: {e}")
