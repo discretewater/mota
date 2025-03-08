@@ -2,9 +2,9 @@
 Mota测试模块
 """
 
+from typer.testing import CliRunner
 import pytest
 import os
-from pathlib import Path
 import logging
 from collections.abc import Mapping
 from edn_format import Keyword
@@ -120,9 +120,9 @@ def test_extract_fields():
 
 # 新增针对主要功能的测试用例（仅针对OpenAI ChatGPT API模拟）
 
-from typer.testing import CliRunner
 
 # 定义一个假的OpenAI API响应对象
+
 class FakeUsage:
     def _asdict(self):
         return {"total_tokens": 50}

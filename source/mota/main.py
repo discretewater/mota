@@ -20,9 +20,14 @@ import typer
 import edn_format
 from edn_format import Keyword  # 导入 Keyword
 from pathlib import Path
-from dotenv import dotenv_values
 import keyring  # 用于处理 .authinfo 文件
 import gnupg  # 用于处理加密的 .authinfo.gpg
+
+# 导入 LangChain 相关模块
+from langchain_community.document_loaders import DirectoryLoader  # 用于递归加载目录下的各种文档格式
+from langchain_community.embeddings import HuggingFaceEmbeddings  # 向量化嵌入模型，HuggingFaceEmbeddings通用性较好
+from langchain_community.vectorstores import FAISS  # 使用 FAISS 构建向量索引以便于高效检索
+
 
 # Initialize typer app
 cli = typer.Typer(help="Mota - LLM API Interaction Tool", add_completion=False)
@@ -32,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 # 定义 OpenAI 客户端（仅在需要时初始化）
 openai_client = None
+
 
 def setup_logging(level: str = "INFO", output: str = "stdout") -> None:
     """
@@ -173,7 +179,7 @@ def parse_response(response: Any,
         from mota.custom_interface import ResponseParserInterface
         if not isinstance(custom_parser, ResponseParserInterface):
             logger.warning(f"自定义解析器未实现 ResponseParserInterface 接口")
-            
+
         return custom_parser(response)
 
     # 默认解析逻辑
@@ -227,19 +233,19 @@ def extract_fields(response_dict: Dict[str, Any],
 def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request_params: Dict[str, Any]) -> Any:
     """
     默认的 LLM API 调用函数，根据提供商名称调用相应的 LLM API.
-    
+
     支持基于配置参数实现各主流 LLM API 的调用，包括 openai 和 anthropic.
     也可扩展支持其他 LLM 提供商。
-    
+
     Args:
         provider (str): LLM 提供商名称，如 "openai", "anthropic" 等。
         api_key (str): API 认证密钥。
         formatted_prompt (str): 格式化后的提示词。
         request_params (Dict[str, Any]): 请求参数，包括模型名称、温度、流模式、最大 token 数等。
-    
+
     Returns:
         Any: LLM API 的响应对象。
-    
+
     Raises:
         NotImplementedError: 当指定提供商的调用逻辑未实现时。
     """
@@ -249,14 +255,14 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
         global openai_client
         if openai_client is None:
             openai_client = OpenAI(api_key=api_key)
-            
+
         # 构建消息列表
         messages = [{"role": "system", "content": formatted_prompt}]
-        
+
         # 添加用户消息到消息列表中
         user_message = request_params.get("message")
         messages.append({"role": "user", "content": user_message})
-            
+
         return openai_client.chat.completions.create(
             model=request_params["model"],
             messages=messages,
@@ -267,12 +273,12 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
     elif provider_lower == "anthropic":
         import anthropic
         client = anthropic.Client(api_key)
-        
+
         # 构建 Anthropic 的提示词格式
         # 注意：Anthropic 的 API 可能需要特定的提示词格式
         system_prompt = formatted_prompt
         user_message = request_params.get("message")
-        
+
         # 使用 Claude 消息 API
         try:
             return client.messages.create(
@@ -300,16 +306,16 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
 def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
     """
     获取 LLM API 调用函数.
-    
+
     如果用户提供了自定义的 LLM API 调用函数路径，则导入该函数。
     否则，使用默认的 LLM API 调用函数。
-    
+
     Args:
         custom_caller (Optional[str]): 用户自定义函数路径，格式为 "模块名:函数名"。
-    
+
     Returns:
         Callable: 用于调用 LLM API 的函数。
-    
+
     Raises:
         Exception: 当自定义函数导入失败时。
     """
@@ -320,12 +326,12 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
             mod = importlib.import_module(module_name)
             func = getattr(mod, func_name)
             logger.debug(f"使用用户自定义 LLM 调用函数: {custom_caller}")
-            
+
             # 检查是否符合接口要求
             from mota.custom_interface import LLMCallerInterface
             if not isinstance(func, LLMCallerInterface):
                 logger.warning(f"自定义函数 {custom_caller} 未实现 LLMCallerInterface 接口")
-                
+
             return func
         except Exception as e:
             logger.error(f"加载用户自定义 LLM 调用函数失败: {e}")
@@ -334,8 +340,60 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
         return default_llm_call
 
 
+def retrieve_context_knowledge(directory_path: str, query: str, top_k: int = 5) -> List[str]:
+    """
+    从指定目录递归加载文档，并基于问题描述检索出相关的上下文文本。
+
+    参数:
+        directory_path (str): 存放文档文件的根目录路径。该目录下会递归查找 DOCX、PDF、TXT 等文件。
+        query (str): 用户输入的问题描述，用于检索相关的文档上下文。
+        top_k (int): 检索返回的最相关文档数量，默认为 5。
+
+    返回:
+        List[str]: 一个字符串列表，每个字符串为一个检索出的文档的上下文文本内容。
+
+    实现步骤:
+        1. 使用 UnstructuredDirectoryLoader 递归加载指定目录下的所有支持的文档文件。
+        2. 利用 OpenAIEmbeddings 将文档转换为向量表示。
+        3. 使用 FAISS 向量存储构建文档索引。
+        4. 基于用户输入的 query 进行相似度搜索，返回最相关的文档。
+    """
+    # 检查目录是否存在
+    if not os.path.isdir(directory_path):
+        raise ValueError(f"指定的目录不存在：{directory_path}")
+
+    # 1. 加载目录下的所有文档
+    # 参数 recursive=True 表示递归读取子目录中的文件
+    # 注意：DirectoryLoader 会自动根据文件后缀（如 .pdf, .docx, .txt）加载文档
+    loader = DirectoryLoader(directory_path, recursive=True)
+    logger.info("开始加载文档...")
+    documents = loader.load()
+    logger.info(f"共加载到 {len(documents)} 个文档。")
+
+    # 2. 初始化嵌入模型
+    # 使用HuggingFaceEmbeddings的嵌入模型进行向量化
+    embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")  # “all-MiniLM-L6-v2”（小）和“all-mpnet-base-v2”（大）
+
+    # 3. 构建向量存储索引（FAISS）
+    # FAISS.from_documents 会对每个文档调用嵌入模型，将文档转换为向量，并建立索引以支持快速检索
+    vectorstore = FAISS.from_documents(documents, embeddings)
+
+    # 4. 根据用户的问题描述进行相似度搜索，返回 top_k 个最相关的文档
+    logger.info("开始进行相似度搜索...")
+    retrieved_docs = vectorstore.similarity_search(query, k=top_k)
+
+    # 提取检索到的文档内容（page_content 为文档文本内容）
+    context_knowledge = [doc.page_content for doc in retrieved_docs]
+    logger.debug("RAG检索到的上下文内容: %s", context_knowledge)
+    logger.info("完成相似度搜索。")
+
+    # 返回结果列表
+    return context_knowledge
+
+
 # 创建一个不使用子命令的 Typer 应用
 cli = typer.Typer(help="Mota - LLM API Interaction Tool", add_completion=False)
+
 
 @cli.command()
 def main(
@@ -364,6 +422,7 @@ def main(
     fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔"),
     custom_caller: Optional[str] = typer.Option(None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
     custom_parser: Optional[str] = typer.Option(None, help="自定义响应解析函数路径，格式为 模块名:函数名", show_default=False),
+    knowledge_dir: Optional[str] = typer.Option(None, help="知识库目录路径，用于RAG检索增强生成", show_default=False),
     user_query: Optional[List[str]] = typer.Argument(None, help="附加的用户查询，将会附加到主要用户消息后")
 ) -> None:
     """
@@ -376,7 +435,7 @@ def main(
 
         # 处理用户查询参数作为用户消息
         actual_user_message = message
-        
+
         if user_query:
             logger.debug(f"检测到用户查询参数: {user_query}")
             # 将用户查询添加到用户消息后面
@@ -410,7 +469,29 @@ def main(
         logger.debug(f"最终请求参数: {request_params}")
 
         # 格式化提示词
-        formatted_prompt = format_prompt(prompt, **{})
+        formatted_prompt = prompt
+
+        # 如果指定了知识库目录，则进行RAG检索
+        if knowledge_dir:
+            logger.info(f"检测到知识库目录: {knowledge_dir}，将进行RAG检索")
+            # 构建查询字符串，结合系统提示词和用户消息
+            query = f"{prompt} {actual_user_message}"
+            # 调用RAG检索函数获取相关上下文
+            try:
+                context_knowledge = retrieve_context_knowledge(knowledge_dir, query)
+                # 将检索到的上下文合并为一个字符串
+                context_text = "\n\n".join(context_knowledge)
+                # 将上下文添加到提示词中
+                formatted_prompt = f"{prompt}\n\n参考以下相关信息：\n\n{context_text}"
+                logger.info("成功添加RAG检索结果到提示词")
+                logger.debug(f"添加RAG后的提示词长度: {len(formatted_prompt)}")
+            except Exception as e:
+                logger.error(f"RAG检索失败: {e}")
+                # 如果RAG检索失败，仍使用原始提示词继续
+                logger.info("将使用原始提示词继续")
+
+        # 格式化最终提示词
+        formatted_prompt = format_prompt(formatted_prompt, **{})
         logger.debug(f"格式化后的提示词: {formatted_prompt}")
 
         # 调用 LLM API 的统一接口函数，根据配置参数和自定义函数实现调用逻辑
@@ -421,7 +502,7 @@ def main(
 
         # 获取自定义解析器
         custom_parser_func = get_llm_call_func(custom_parser) if custom_parser else None
-        
+
         # 解析响应
         parsed_response = parse_response(response, custom_parser=custom_parser_func)
         logger.debug(f"解析后的响应: {parsed_response}")
