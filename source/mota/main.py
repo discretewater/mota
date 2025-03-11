@@ -25,7 +25,7 @@ import gnupg  # 用于处理加密的 .authinfo.gpg
 
 # 导入 LangChain 相关模块
 from langchain_community.document_loaders import DirectoryLoader  # 用于递归加载目录下的各种文档格式
-from langchain_community.embeddings import HuggingFaceEmbeddings  # 向量化嵌入模型，HuggingFaceEmbeddings通用性较好
+from langchain_huggingface import HuggingFaceEmbeddings  # 向量化嵌入模型，HuggingFaceEmbeddings通用性较好
 from langchain_community.vectorstores import FAISS  # 使用 FAISS 构建向量索引以便于高效检索
 
 
@@ -314,7 +314,7 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
         custom_caller (Optional[str]): 用户自定义函数路径，格式为 "模块名:函数名"。
 
     Returns:
-        Callable: 用于调用 LLM API 的函数。
+        Callable: 用于调用 LLM API 的函数，必须实现 LLMCallerInterface 接口
 
     Raises:
         Exception: 当自定义函数导入失败时。
@@ -338,6 +338,39 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
             raise
     else:
         return default_llm_call
+
+
+def get_parser_func(custom_parser: str) -> Callable:
+    """
+    获取响应解析函数
+
+    导入用户自定义的响应解析函数并验证其接口合规性
+
+    Args:
+        custom_parser (str): 用户自定义函数路径，格式为 "模块名:函数名"
+
+    Returns:
+        Callable: 实现 ResponseParserInterface 的解析函数
+
+    Raises:
+        Exception: 当函数导入失败或接口不兼容时
+    """
+    import importlib
+    try:
+        module_name, func_name = custom_parser.split(":")
+        mod = importlib.import_module(module_name)
+        func = getattr(mod, func_name)
+        logger.debug(f"使用用户自定义响应解析函数: {custom_parser}")
+
+        # 检查是否符合响应解析接口要求
+        from mota.custom_interface import ResponseParserInterface
+        if not isinstance(func, ResponseParserInterface):
+            logger.warning(f"自定义解析器 {custom_parser} 未实现 ResponseParserInterface 接口")
+
+        return func
+    except Exception as e:
+        logger.error(f"加载用户自定义响应解析函数失败: {e}")
+        raise
 
 
 def retrieve_context_knowledge(directory_path: str, query: str, top_k: int = 5) -> List[str]:
@@ -501,7 +534,7 @@ def main(
         logger.debug(f"API响应: {response}")
 
         # 获取自定义解析器
-        custom_parser_func = get_llm_call_func(custom_parser) if custom_parser else None
+        custom_parser_func = get_parser_func(custom_parser) if custom_parser else None
 
         # 解析响应
         parsed_response = parse_response(response, custom_parser=custom_parser_func)
