@@ -16,7 +16,8 @@ from mota.main import (
     load_config,
     get_api_key,
     format_prompt,
-    parse_response,
+    default_parse,
+    get_parser_func,
     extract_fields
 )
 
@@ -67,6 +68,24 @@ def test_format_prompt():
         format_prompt(template, wrong_param="World")
 
 
+def test_format_prompt_empty():
+    """测试空提示词格式化"""
+    # 测试空字符串提示词
+    empty_template = ""
+    result = format_prompt(empty_template)
+    assert result == ""
+
+    # 测试只有空格的提示词
+    space_template = "   "
+    result = format_prompt(space_template)
+    assert result == "   "
+
+    # 测试包含格式化占位符但无需参数的提示词
+    no_param_template = "Hello, World!"
+    result = format_prompt(no_param_template)
+    assert result == "Hello, World!"
+
+
 def test_parse_response():
     """测试响应解析"""
     # 模拟响应对象
@@ -80,7 +99,7 @@ def test_parse_response():
         usage = type("Usage", (), {"_asdict": lambda self: {"total_tokens": 10}})()
 
     response = MockResponse()
-    result = parse_response(response)
+    result = default_parse(response)
 
     assert result["content"] == "Test content"
     assert result["model"] == "test-model"
@@ -89,11 +108,19 @@ def test_parse_response():
 
 def test_parse_response_custom_parser():
     """测试自定义响应解析器"""
-    def custom_parser(response):
-        return {"custom_field": "custom_value"}
+    # 模拟自定义解析器模块
+    with patch("mota.main.load_custom_func") as mock_load_custom_func:
+        # 创建一个模拟的解析函数
+        def mock_parser(response):
+            return {"custom_field": "custom_value"}
+        mock_load_custom_func.return_value = mock_parser
 
-    result = parse_response(None, custom_parser)
-    assert result["custom_field"] == "custom_value"
+        # 调用get_parser_func并传入文件路径字符串
+        parser_func = get_parser_func("path/to/custom_parser.py")
+
+        # 使用返回的解析函数解析响应
+        result = parser_func("mock_response")
+        assert result["custom_field"] == "custom_value"
 
 
 def test_extract_fields():

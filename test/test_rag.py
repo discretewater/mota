@@ -149,7 +149,7 @@ def test_retrieve_context_knowledge_integration(mock_faiss, mock_embeddings, moc
         assert result[i] == f"相关量子力学内容 {i}"
 
 
-@patch("mota.main.parse_response")
+@patch("mota.main.default_parse")
 @patch("mota.main.load_config")
 @patch("mota.main.get_api_key")
 @patch("mota.main.get_llm_call_func")

@@ -79,6 +79,7 @@ class GroqLLMCaller(LLMCallerInterface):
 
         # 使用指定的参数进行 API 调用
         try:
+            # 直接使用client对象调用completions.create方法
             completion = client.chat.completions.create(
                 model=model,
                 messages=messages,

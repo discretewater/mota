@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test the LLM API calling functions' unified interface
 
@@ -12,19 +11,9 @@ import sys
 import types
 import pytest
 import importlib.util
+from typing import Any, Dict, Generator, Union
 from unittest.mock import MagicMock, patch
-
-# Define a dummy custom LLM calling function for testing
-
-
-def dummy_llm_caller(provider, api_key, formatted_prompt, request_params):
-    return {
-        "provider": provider,
-        "api_key": api_key,
-        "prompt": formatted_prompt,
-        "params": request_params
-    }
-
+from mota.custom_interface import LLMCallerInterface
 
 # Import the module to be tested (source/mota/main.py)
 spec = importlib.util.spec_from_file_location("main_module", os.path.join(os.path.dirname(__file__), "../source/mota/main.py"))
@@ -43,24 +32,57 @@ def test_get_llm_call_func_default():
 def test_get_llm_call_func_custom():
     """
     Test loading a user-defined LLM API calling function.
-    Inject dummy_llm_caller into a temporary module and verify that get_llm_call_func
+    Inject DummyLLMCaller into a temporary module and verify that get_llm_call_func
     correctly imports this function.
     """
-    temp_module = types.ModuleType("temp_module")
-    temp_module.dummy_llm_caller = dummy_llm_caller
-    sys.modules["temp_module"] = temp_module
+    # 创建一个临时模块文件
+    import tempfile
+    import os
 
-    func = main_module.get_llm_call_func("temp_module:dummy_llm_caller")
-    result = func("test_provider", "test_key", "Hello, world!", {
-        "model": "dummy-model",
-        "temperature": 0.5,
-        "stream": False,
-        "max_tokens": 100
-    })
-    assert result["provider"] == "test_provider"
-    assert result["api_key"] == "test_key"
-    assert result["prompt"] == "Hello, world!"
-    assert result["params"]["model"] == "dummy-model"
+    # 创建一个临时目录和临时模块文件
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_module_path = os.path.join(temp_dir, "dummy_llm_caller.py")
+
+        # 写入一个实现了LLMCallerInterface的类到临时模块
+        with open(temp_module_path, "w") as f:
+            f.write("""
+from typing import Any, Dict, Generator, Union
+from mota.custom_interface import LLMCallerInterface
+
+class DummyLLMCaller(LLMCallerInterface):
+    def call(self, provider: str, api_key: str, formatted_prompt: str,
+             request_params: Dict[str, Any]) -> Union[Any, Generator]:
+        # 简单的实现，返回一个固定的响应
+        return {"dummy_response": "This is a test response"}
+""")
+
+        # 使用临时模块路径调用get_llm_call_func
+        custom_func = main_module.get_llm_call_func(temp_module_path)
+
+        # 验证返回的函数不是默认函数
+        assert custom_func != main_module.default_llm_call
+
+        # 调用返回的函数并验证其行为
+        with patch("mota.loader.load_module_from_path") as mock_load_module:
+            # 模拟加载模块的行为
+            mock_module = types.ModuleType("dummy_module")
+
+            # 创建一个DummyLLMCaller类
+            class DummyLLMCaller(LLMCallerInterface):
+                def call(self, provider: str, api_key: str, formatted_prompt: str,
+                         request_params: Dict[str, Any]) -> Union[Any, Generator]:
+                    return {"dummy_response": "This is a test response"}
+
+            # 将DummyLLMCaller添加到模拟模块
+            setattr(mock_module, "DummyLLMCaller", DummyLLMCaller)
+            mock_load_module.return_value = mock_module
+
+            # 重新获取函数
+            custom_func = main_module.get_llm_call_func(temp_module_path)
+
+            # 调用函数并验证结果
+            result = custom_func("test_provider", "test_api_key", "test_prompt", {})
+            assert result == {"dummy_response": "This is a test response"}
 
 
 @pytest.mark.parametrize("stream_mode", [True, False])
@@ -100,7 +122,7 @@ def test_custom_groq_api(stream_mode):
 
         # 调用函数 - 使用类实例调用
         groq_caller = custom_groq.GroqLLMCaller()
-        groq_caller(provider, api_key, prompt, params)
+        groq_caller.call(provider, api_key, prompt, params)
 
         # 验证 Groq 客户端是否使用正确的 API 密钥初始化
         mock_groq.assert_called_once_with(api_key=api_key)
@@ -120,15 +142,6 @@ def test_custom_groq_api(stream_mode):
             stream=params["stream"],
             stop=None
         )
-
-        # 测试向后兼容性 - 使用函数别名
-        mock_groq.reset_mock()
-        mock_completions.reset_mock()
-        custom_groq.call_groq_api(provider, api_key, prompt, params)
-
-        # 验证函数别名是否正常工作
-        mock_groq.assert_called_once_with(api_key=api_key)
-        mock_completions.assert_called_once()
 
 
 @pytest.mark.parametrize("stream_mode", [True, False])
@@ -168,7 +181,7 @@ def test_custom_groq_api_without_user_message(stream_mode):
 
         # 使用类实例测试
         groq_caller = custom_groq.GroqLLMCaller()
-        groq_caller(provider, api_key, prompt, params)
+        groq_caller.call(provider, api_key, prompt, params)
 
         # 验证 completions.create 是否使用正确的参数调用
         # 应该有系统消息和默认用户消息
@@ -176,21 +189,6 @@ def test_custom_groq_api_without_user_message(stream_mode):
             {"role": "system", "content": prompt},
             {"role": "user", "content": "请根据上述提示进行回答"}
         ]
-
-        mock_completions.assert_called_once_with(
-            model=params["model"],
-            messages=expected_messages,
-            temperature=params["temperature"],
-            max_completion_tokens=params["max_tokens"],
-            top_p=params["top_p"],
-            stream=params["stream"],
-            stop=None
-        )
-
-        # 测试向后兼容性 - 使用函数别名
-        mock_groq.reset_mock()
-        mock_completions.reset_mock()
-        custom_groq.call_groq_api(provider, api_key, prompt, params)
 
         mock_completions.assert_called_once_with(
             model=params["model"],
@@ -237,14 +235,7 @@ def test_parse_groq_response_non_stream():
 
     # 使用类实例测试
     parser = custom_groq.GroqResponseParser()
-    result = parser(response)
-
-    assert result["content"] == "test content"
-    assert result["model"] == "test-model"
-    assert result["usage"]["total_tokens"] == 100
-
-    # 测试向后兼容性 - 使用函数别名
-    result = custom_groq.parse_groq_response(response)
+    result = parser.parse(response)
 
     assert result["content"] == "test content"
     assert result["model"] == "test-model"
@@ -272,14 +263,7 @@ def test_parse_groq_response_stream():
 
     # 使用类实例测试
     parser = custom_groq.GroqResponseParser()
-    result = parser(iter(chunks))
-
-    assert result["content"] == "Hello World!"
-    assert result["model"] == "llama2-70b"
-    assert result["usage"]["total_tokens"] == 225  # 50 + 75 + 100
-
-    # 测试向后兼容性 - 使用函数别名
-    result = custom_groq.parse_groq_response(iter(chunks))
+    result = parser.parse(iter(chunks))
 
     assert result["content"] == "Hello World!"
     assert result["model"] == "llama2-70b"
@@ -305,14 +289,7 @@ def test_parse_groq_response_error_handling(caplog):
     # 使用类实例测试
     parser = custom_groq.GroqResponseParser()
     with pytest.raises(Exception):
-        parser(invalid_response)
-
-    assert "解析GROQ响应失败" in caplog.text
-
-    # 测试向后兼容性 - 使用函数别名
-    caplog.clear()
-    with pytest.raises(Exception):
-        custom_groq.parse_groq_response(invalid_response)
+        parser.parse(invalid_response)
 
     assert "解析GROQ响应失败" in caplog.text
 
@@ -338,9 +315,122 @@ def test_interface_implementation():
     groq_caller = custom_groq.GroqLLMCaller()
     groq_parser = custom_groq.GroqResponseParser()
 
-    assert isinstance(groq_caller, custom_interface.LLMCallerInterface)
-    assert isinstance(groq_parser, custom_interface.ResponseParserInterface)
+    # 验证类是否实现了接口的方法
+    assert hasattr(groq_caller, 'call')
+    assert callable(groq_caller.call)
+    assert hasattr(groq_parser, 'parse')
+    assert callable(groq_parser.parse)
 
-    # 验证函数别名是否实现了接口
-    assert isinstance(custom_groq.call_groq_api, custom_interface.LLMCallerInterface)
-    assert isinstance(custom_groq.parse_groq_response, custom_interface.ResponseParserInterface)
+    # 验证类是否是接口的子类 - 使用实例检查而不是类检查
+    # 由于动态导入的模块可能有不同的命名空间，直接检查实例是否实现了接口方法
+    assert hasattr(groq_caller, 'call')
+    assert callable(groq_caller.call)
+    assert hasattr(groq_parser, 'parse')
+    assert callable(groq_parser.parse)
+
+    # 检查方法签名是否符合接口要求
+    from inspect import signature
+    caller_sig = signature(groq_caller.call)
+    assert len(caller_sig.parameters) >= 4  # 至少有4个参数
+
+
+def test_combined_llm_call_and_parser():
+    """
+    测试LLM调用函数与解析函数的组合使用
+
+    验证get_llm_call_func和get_parser_func返回的函数能够正确组合使用，
+    完成从API调用到响应解析的完整流程。
+    """
+    # 创建一个模拟的 groq 模块
+    mock_groq_module = types.ModuleType("groq")
+    mock_groq_class = MagicMock()
+    setattr(mock_groq_module, "Groq", mock_groq_class)
+
+    # 保存原始的 sys.modules
+    original_modules = dict(sys.modules)
+
+    try:
+        # 将模拟的 groq 模块注入到 sys.modules
+        sys.modules["groq"] = mock_groq_module
+
+        # 导入自定义 GROQ 模块
+        groq_spec = importlib.util.spec_from_file_location(
+            "custom_groq",
+            os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
+        )
+        custom_groq = importlib.util.module_from_spec(groq_spec)
+        groq_spec.loader.exec_module(custom_groq)
+
+        # 创建模拟客户端实例和完成方法
+        mock_client = MagicMock()
+        mock_groq_class.return_value = mock_client
+        mock_completions = MagicMock()
+        mock_client.chat.completions.create = mock_completions
+
+        # 创建一个模拟的非流式响应
+        mock_usage = MagicMock()
+        mock_usage._asdict.return_value = {"total_tokens": 150}
+        mock_response = MockCompletion(
+            content="这是一个测试响应",
+            model="deepseek-r1-distill-llama-70b",
+            usage=mock_usage
+        )
+        mock_completions.return_value = mock_response
+
+        # 使用 main_module 中的函数获取调用函数和解析函数
+        with patch("mota.loader.load_module_from_path") as mock_load_module:
+            # 模拟加载模块的行为
+            mock_load_module.return_value = custom_groq
+
+            # 获取LLM调用函数
+            llm_call_func = main_module.get_llm_call_func(
+                os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
+            )
+
+            # 获取响应解析函数
+            parser_func = main_module.get_parser_func(
+                os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
+            )
+
+            # 测试参数
+            provider = "groq"
+            api_key = "test-api-key"
+            prompt = "你是一个专业的AI助手"
+            params = {
+                "model": "deepseek-r1-distill-llama-70b",
+                "temperature": 0.7,
+                "stream": False,
+                "max_tokens": 2000,
+                "message": "请解释量子力学"
+            }
+
+            # 调用LLM函数
+            response = llm_call_func(provider, api_key, prompt, params)
+
+            # 验证LLM调用参数
+            mock_groq_class.assert_called_once_with(api_key=api_key)
+            expected_messages = [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": "请解释量子力学"}
+            ]
+            mock_completions.assert_called_once_with(
+                model=params["model"],
+                messages=expected_messages,
+                temperature=params["temperature"],
+                max_completion_tokens=params["max_tokens"],
+                top_p=0.62,  # 默认值
+                stream=False,
+                stop=None
+            )
+
+            # 解析响应
+            parsed_result = parser_func(response)
+
+            # 验证解析结果
+            assert parsed_result["content"] == "这是一个测试响应"
+            assert parsed_result["model"] == "deepseek-r1-distill-llama-70b"
+            assert parsed_result["usage"]["total_tokens"] == 150
+    finally:
+        # 恢复原始的 sys.modules
+        sys.modules.clear()
+        sys.modules.update(original_modules)

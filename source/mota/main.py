@@ -225,11 +225,11 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
     """
     默认的 LLM API 调用函数，根据提供商名称调用相应的 LLM API.
 
-    支持基于配置参数实现各主流 LLM API 的调用，包括 openai 和 anthropic.
-    也可扩展支持其他 LLM 提供商。
+    支持基于配置参数实现 OpenAI API 的调用。
+    其他 LLM 提供商通过自定义模块实现。
 
     Args:
-        provider (str): LLM 提供商名称，如 "openai", "anthropic" 等。
+        provider (str): LLM 提供商名称，目前仅支持 "openai"。
         api_key (str): API 认证密钥。
         formatted_prompt (str): 格式化后的提示词。
         request_params (Dict[str, Any]): 请求参数，包括模型名称、温度、流模式、最大 token 数等。
@@ -261,34 +261,7 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
             stream=request_params["stream"],
             max_tokens=request_params["max_tokens"]
         )
-    elif provider_lower == "anthropic":
-        import anthropic
-        client = anthropic.Client(api_key)
-
-        # 构建 Anthropic 的提示词格式
-        # 注意：Anthropic 的 API 可能需要特定的提示词格式
-        system_prompt = formatted_prompt
-        user_message = request_params.get("message")
-
-        # 使用 Claude 消息 API
-        try:
-            return client.messages.create(
-                model=request_params["model"],
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-                temperature=request_params["temperature"],
-                max_tokens=request_params["max_tokens"]
-            )
-        except (AttributeError, TypeError):
-            # 如果新版 API 不可用，回退到旧版 API
-            return client.completion(
-                prompt=f"{system_prompt}\n\nHuman: {user_message}\n\nAssistant:",
-                model=request_params["model"],
-                temperature=request_params["temperature"],
-                stop_sequences=["\n\nHuman:"],
-                max_tokens_to_sample=request_params["max_tokens"]
-            )
-    # 添加其他默认支持的 LLM 提供商调用逻辑，此处可根据需求扩展
+    # 其他 LLM 提供商通过自定义模块实现
     else:
         logger.error(f"尚未实现 {provider} 提供商的API调用逻辑")
         raise NotImplementedError(f"{provider} 提供商的API调用逻辑未实现")
