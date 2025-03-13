@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Mota - A Comprehensive LLM API Interaction Tool
 
@@ -27,6 +26,9 @@ import gnupg  # 用于处理加密的 .authinfo.gpg
 from langchain_community.document_loaders import DirectoryLoader  # 用于递归加载目录下的各种文档格式
 from langchain_huggingface import HuggingFaceEmbeddings  # 向量化嵌入模型，HuggingFaceEmbeddings通用性较好
 from langchain_community.vectorstores import FAISS  # 使用 FAISS 构建向量索引以便于高效检索
+
+from mota.custom_interface import LLMCallerInterface, ResponseParserInterface
+from mota.loader import load_module_from_path, find_implementor
 
 
 # Initialize typer app
@@ -162,8 +164,7 @@ def format_prompt(template: str, **kwargs: Any) -> str:
         raise
 
 
-def parse_response(response: Any,
-                   custom_parser: Optional[Callable] = None) -> Dict[str, Any]:
+def default_parse(response: Any) -> Dict[str, Any]:
     """
     解析API响应
 
@@ -174,14 +175,6 @@ def parse_response(response: Any,
     Returns:
         Dict[str, Any]: 解析后的响应内容
     """
-    if custom_parser:
-        # 检查是否符合接口要求
-        from mota.custom_interface import ResponseParserInterface
-        if not isinstance(custom_parser, ResponseParserInterface):
-            logger.warning(f"自定义解析器未实现 ResponseParserInterface 接口")
-
-        return custom_parser(response)
-
     # 默认解析逻辑
     try:
         # 处理 OpenAI 流式响应
@@ -227,8 +220,6 @@ def extract_fields(response_dict: Dict[str, Any],
             logger.warning(f"字段 {field} 在响应中不存在")
     return extracted
 
-
-# 新增统一 LLM API 调用函数及自定义调用函数支持
 
 def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request_params: Dict[str, Any]) -> Any:
     """
@@ -303,6 +294,48 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
         raise NotImplementedError(f"{provider} 提供商的API调用逻辑未实现")
 
 
+def load_custom_func(
+    module_name: str,
+    module_path: str,
+    interface_class: type,
+    method_name: str
+) -> Callable:
+    """
+    加载用户自定义函数。
+
+    从指定的模块路径加载模块，并在其中查找实现了指定接口类的类。
+    然后，实例化该类并返回其实例的指定方法。
+
+    Args:
+        module_name (str): 模块名，例如 "custom_caller"。
+        module_path (str): 模块路径，用户提供的自定义模块文件路径。
+        interface_class (type): 要查找的接口类，例如 LLMCallerInterface。
+        method_name (str): 要获取的方法名，例如 "call"。
+
+    Returns:
+        Callable: 实现了指定接口的类的实例的指定方法。
+
+    Raises:
+        ValueError: 如果在模块中未找到指定接口的实现类。
+        AttributeError: 如果指定方法名不可调用。
+        Exception: 当加载模块、查找实现类或获取方法失败时。
+    """
+    try:
+        module = load_module_from_path(module_name, module_path)
+        implementor_class = find_implementor(module, interface_class)
+        if implementor_class is None:
+            logger.error(f"错误：在提供的模块中未找到“{interface_class.__name__}”的实现类。")
+            raise ValueError(f"未找到实现类：“{interface_class.__name__}”。")
+        instance = implementor_class()
+        func = getattr(instance, method_name)
+        if not callable(func):
+            raise AttributeError(f"“{method_name}”不是可调用方法")
+        return func
+    except Exception as e:
+        logger.error(f"加载用户自定义函数失败: {e}")
+        raise
+
+
 def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
     """
     获取 LLM API 调用函数.
@@ -311,7 +344,7 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
     否则，使用默认的 LLM API 调用函数。
 
     Args:
-        custom_caller (Optional[str]): 用户自定义函数路径，格式为 "模块名:函数名"。
+        custom_caller (Optional[str]): 用户自定义函数路径。
 
     Returns:
         Callable: 用于调用 LLM API 的函数，必须实现 LLMCallerInterface 接口
@@ -320,21 +353,16 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
         Exception: 当自定义函数导入失败时。
     """
     if custom_caller:
-        import importlib
         try:
-            module_name, func_name = custom_caller.split(":")
-            mod = importlib.import_module(module_name)
-            func = getattr(mod, func_name)
-            logger.debug(f"使用用户自定义 LLM 调用函数: {custom_caller}")
-
-            # 检查是否符合接口要求
-            from mota.custom_interface import LLMCallerInterface
-            if not isinstance(func, LLMCallerInterface):
-                logger.warning(f"自定义函数 {custom_caller} 未实现 LLMCallerInterface 接口")
-
+            func = load_custom_func(
+                module_name="custom_caller",
+                module_path=custom_caller,
+                interface_class=LLMCallerInterface,
+                method_name="call"
+            )
             return func
         except Exception as e:
-            logger.error(f"加载用户自定义 LLM 调用函数失败: {e}")
+            logger.error(f"加载用户自定义LLM调用函数失败: {e}")
             raise
     else:
         return default_llm_call
@@ -344,10 +372,13 @@ def get_parser_func(custom_parser: str) -> Callable:
     """
     获取响应解析函数
 
-    导入用户自定义的响应解析函数并验证其接口合规性
+    导入用户自定义的响应解析函数并验证其接口合规性。
+
+    如果用户提供了自定义的响应解析函数路径，则导入该函数。否则，使用默认的响应解析函数。
+
 
     Args:
-        custom_parser (str): 用户自定义函数路径，格式为 "模块名:函数名"
+        custom_parser (str): 用户自定义函数路径。
 
     Returns:
         Callable: 实现 ResponseParserInterface 的解析函数
@@ -355,22 +386,20 @@ def get_parser_func(custom_parser: str) -> Callable:
     Raises:
         Exception: 当函数导入失败或接口不兼容时
     """
-    import importlib
-    try:
-        module_name, func_name = custom_parser.split(":")
-        mod = importlib.import_module(module_name)
-        func = getattr(mod, func_name)
-        logger.debug(f"使用用户自定义响应解析函数: {custom_parser}")
-
-        # 检查是否符合响应解析接口要求
-        from mota.custom_interface import ResponseParserInterface
-        if not isinstance(func, ResponseParserInterface):
-            logger.warning(f"自定义解析器 {custom_parser} 未实现 ResponseParserInterface 接口")
-
-        return func
-    except Exception as e:
-        logger.error(f"加载用户自定义响应解析函数失败: {e}")
-        raise
+    if custom_parser:
+        try:
+            func = load_custom_func(
+                module_name="custom_parser",
+                module_path=custom_parser,
+                interface_class=ResponseParserInterface,
+                method_name="parse"
+            )
+            return func
+        except Exception as e:
+            logger.error(f"加载用户自定义LLM响应解析函数失败: {e}")
+            raise
+    else:
+        return default_parse
 
 
 def retrieve_context_knowledge(directory_path: str, query: str, top_k: int = 5) -> List[str]:
@@ -533,11 +562,10 @@ def main(
 
         logger.debug(f"API响应: {response}")
 
-        # 获取自定义解析器
-        custom_parser_func = get_parser_func(custom_parser) if custom_parser else None
-
+        # 获取解析器
+        parse_func = get_parser_func(custom_parser)
         # 解析响应
-        parsed_response = parse_response(response, custom_parser=custom_parser_func)
+        parsed_response = parse_func(response)
         logger.debug(f"解析后的响应: {parsed_response}")
 
         # 提取指定字段

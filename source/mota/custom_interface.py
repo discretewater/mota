@@ -5,19 +5,20 @@ custom_interface.py - LLM API 调用接口定义
 包括 LLM API 调用接口和响应解析接口，为不同的 LLM 提供商提供统一的调用方式。
 """
 
-from typing import Any, Dict, Union, Generator, Protocol, runtime_checkable
+from typing import Any, Dict, Union, Generator
+from abc import ABC, abstractmethod
 
 
-@runtime_checkable
-class LLMCallerInterface(Protocol):
+class LLMCallerInterface(ABC):
     """
     LLM API 调用接口协议
 
     定义了调用 LLM API 的标准接口，所有自定义 LLM 调用实现都应遵循此接口。
     """
 
-    def __call__(self, provider: str, api_key: str, formatted_prompt: str,
-                 request_params: Dict[str, Any]) -> Union[Any, Generator]:
+    @abstractmethod
+    def call(self, provider: str, api_key: str, formatted_prompt: str,
+             request_params: Dict[str, Any]) -> Union[Any, Generator]:
         """
         调用 LLM API 的标准接口方法
 
@@ -35,15 +36,14 @@ class LLMCallerInterface(Protocol):
         ...
 
 
-@runtime_checkable
-class ResponseParserInterface(Protocol):
+class ResponseParserInterface(ABC):
     """
     LLM API 响应解析接口协议
 
     定义了解析 LLM API 响应的标准接口，所有自定义响应解析器都应遵循此接口。
     """
 
-    def __call__(self, response: Any) -> Dict[str, Any]:
+    def parse(self, response: Any) -> Dict[str, Any]:
         """
         解析 LLM API 响应的标准接口方法
 

@@ -1,4 +1,4 @@
-# custom_groq.py
+
 """
 custom_groq.py - GROQ API 调用模块
 
@@ -17,15 +17,15 @@ from mota.custom_interface import LLMCallerInterface, ResponseParserInterface
 logger = logging.getLogger(__name__)
 
 
-class GroqLLMCaller:
+class GroqLLMCaller(LLMCallerInterface):
     """
     GROQ API 调用实现类
 
     实现了 LLMCallerInterface 接口，提供 GROQ API 的调用功能。
     """
 
-    def __call__(self, provider: str, api_key: str, formatted_prompt: str,
-                 request_params: Dict[str, Any]) -> Union[Any, Generator]:
+    def call(self, provider: str, api_key: str, formatted_prompt: str,
+             request_params: Dict[str, Any]) -> Union[Any, Generator]:
         """
         根据官方规范调用 GROQ API 的实现方法。
 
@@ -98,14 +98,14 @@ class GroqLLMCaller:
             raise
 
 
-class GroqResponseParser:
+class GroqResponseParser(ResponseParserInterface):
     """
     GROQ API 响应解析实现类
 
     实现了 ResponseParserInterface 接口，提供 GROQ API 响应的解析功能。
     """
 
-    def __call__(self, response: Any) -> Dict[str, Any]:
+    def parse(self, response: Any) -> Dict[str, Any]:
         """
         解析GROQ API响应的实现方法
 
@@ -160,8 +160,3 @@ class GroqResponseParser:
         except Exception as e:
             logger.error(f"解析GROQ响应失败: {e}")
             raise
-
-
-# 为了向后兼容，保留原始函数名称但使用新的类实现
-call_groq_api = GroqLLMCaller()
-parse_groq_response = GroqResponseParser()
