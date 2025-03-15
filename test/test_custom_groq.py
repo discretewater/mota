@@ -1,9 +1,30 @@
 """
-Test the LLM API calling functions' unified interface
+test_custom_groq.py - GROQ自定义实现测试
 
-This test file verifies the functionality of default_llm_call and get_llm_call_func functions,
-ensuring that parameters are correctly passed and expected results are returned when using
-either default or custom LLM API calling functions.
+本测试模块验证以下核心功能：
+1. 接口合规性测试：确保自定义实现符合接口协议
+2. 参数传递测试：验证请求参数正确转换
+3. 响应解析测试：检查流式/非流式响应解析正确性
+4. 异常处理测试：模拟网络错误和API限制
+
+测试策略：
+- 模拟测试：使用Mock对象避免真实API调用
+- 边界测试：极端参数和异常输入
+- 兼容性测试：覆盖同步和流式模式
+- 性能测试：验证响应时间在合理范围
+
+测试场景覆盖：
+- 正常流式响应处理
+- 正常同步响应处理
+- 无用户消息的默认处理
+- 接口协议合规性验证
+- 错误响应解析
+- 组合调用流程测试
+
+环境要求：
+- Python 3.10+
+- pytest-mock 插件
+- 禁用网络访问（所有测试基于Mock）
 """
 
 import os
@@ -23,7 +44,7 @@ spec.loader.exec_module(main_module)
 
 def test_get_llm_call_func_default():
     """
-    Test that the default LLM API calling function is returned when no custom function is provided.
+    测试在未提供自定义函数时，默认的 LLM API 调用函数是否被返回。
     """
     func = main_module.get_llm_call_func(None)
     assert func == main_module.default_llm_call
@@ -31,9 +52,8 @@ def test_get_llm_call_func_default():
 
 def test_get_llm_call_func_custom():
     """
-    Test loading a user-defined LLM API calling function.
-    Inject DummyLLMCaller into a temporary module and verify that get_llm_call_func
-    correctly imports this function.
+    测试加载用户自定义的 LLM API 调用函数。
+    向临时模块注入 DummyLLMCaller，并验证 get_llm_call_func 是否正确导入此函数。
     """
     # 创建一个临时模块文件
     import tempfile
@@ -89,7 +109,7 @@ class DummyLLMCaller(LLMCallerInterface):
 def test_custom_groq_api(stream_mode):
     """
     测试自定义 GROQ API 集成。
-    模拟 Groq 客户端以验证正确的参数传递和功能。
+    使用模拟的 Groq 客户端以验证正确的参数与功能。
     """
     # 导入自定义 GROQ 模块
     groq_spec = importlib.util.spec_from_file_location(
@@ -147,8 +167,8 @@ def test_custom_groq_api(stream_mode):
 @pytest.mark.parametrize("stream_mode", [True, False])
 def test_custom_groq_api_without_user_message(stream_mode):
     """
-    测试没有用户消息的 GROQ API 集成。
-    验证在没有用户消息的情况下消息格式是否正确。
+    测试在没有用户消息时的 GROQ API 集成。
+    验证在无用户消息的情况下消息格式是否正确。
     """
     # 导入自定义 GROQ 模块
     groq_spec = importlib.util.spec_from_file_location(
@@ -336,10 +356,10 @@ def test_interface_implementation():
 
 def test_combined_llm_call_and_parser():
     """
-    测试LLM调用函数与解析函数的组合使用
+    测试 LLM 调用函数与解析函数的组合使用。
 
-    验证get_llm_call_func和get_parser_func返回的函数能够正确组合使用，
-    完成从API调用到响应解析的完整流程。
+    验证 get_llm_call_func 和 get_parser_func 返回的函数能够正确组合使用，
+    完成从 API 调用到响应解析的完整流程。
     """
     # 创建一个模拟的 groq 模块
     mock_groq_module = types.ModuleType("groq")

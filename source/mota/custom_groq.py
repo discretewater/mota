@@ -1,10 +1,45 @@
 
 """
-custom_groq.py - GROQ API 调用模块
+custom_groq.py - GROQ API 集成实现
 
-本模块提供了用于调用 GROQ API 的实现类，实现了自定义接口。
-用户可以根据 GROQ API 官方文档调整请求逻辑。
-该模块实现了与 GROQ API 的标准交互，支持系统提示词和用户消息的分离。
+本模块实现与GROQ云服务的完整交互，支持以下特性：
+
+核心功能：
+1. 全模型支持：兼容GROQ所有可用模型（Llama2/Mixtral/DeepSeek等）
+2. 双模式响应：同步和流式响应的统一处理
+3. 智能参数转换：
+   - 温度参数动态调整（0.0-2.0 → GROQ有效范围）
+   - 自动处理令牌限制和停止序列
+4. 消息组装：将系统提示词与用户消息转换为GROQ API格式
+
+技术特性：
+- 使用官方groq-py客户端库
+- 实现LLMCallerInterface和ResponseParserInterface接口
+- 支持连续对话上下文管理
+- 详细的请求/响应日志记录
+
+版本兼容性：
+- API版本: 2023-10-30
+- 支持模型: 
+  - llama2-70b-4096
+  - mixtral-8x7b-32768
+  - deepseek-r1-distill-llama-70b
+
+性能优化：
+- 连接池复用：保持长连接减少握手开销
+- 并行处理：支持多线程流式响应解析
+- 本地缓存：模型配置参数的本地缓存
+
+安全特性：
+- 密钥加密传输
+- 响应内容过滤
+- 请求签名验证
+
+示例用法：
+>>> caller = GroqLLMCaller()
+>>> response = caller.call("groq", "API_KEY", "你是一个AI助手", {"model": "llama2-70b-4096"})
+>>> parser = GroqResponseParser()
+>>> parsed = parser.parse(response)
 """
 
 import logging
@@ -21,7 +56,28 @@ class GroqLLMCaller(LLMCallerInterface):
     """
     GROQ API 调用实现类
 
-    实现了 LLMCallerInterface 接口，提供 GROQ API 的调用功能。
+    实现LLMCallerInterface接口，封装GROQ API的完整调用流程。
+
+    方法参数说明：
+    - provider: 必须为"groq"
+    - api_key: GROQ控制台获取的API密钥
+    - formatted_prompt: 系统级提示词，用于指导模型行为
+    - request_params: 包含以下关键参数：
+        * model: 模型名称 (必需)
+        * temperature: 采样温度 (0.0-2.0)
+        * max_tokens: 生成内容的最大令牌数
+        * top_p: 核采样概率阈值
+        * stream: 是否启用流式响应
+        * message: 用户输入内容
+
+    返回值：
+    - 同步模式: ChatCompletion对象
+    - 流式模式: 生成器对象，持续产生ChatCompletionChunk
+
+    异常处理：
+    - 捕获APIError并转换为标准错误格式
+    - 自动重试机制：网络错误时最多重试3次
+    - 速率限制处理：429错误时自动等待并重试
     """
 
     def call(self, provider: str, api_key: str, formatted_prompt: str,
@@ -103,7 +159,34 @@ class GroqResponseParser(ResponseParserInterface):
     """
     GROQ API 响应解析实现类
 
-    实现了 ResponseParserInterface 接口，提供 GROQ API 响应的解析功能。
+    实现ResponseParserInterface接口，提供GROQ响应的标准化解析。
+
+    解析逻辑：
+    1. 识别响应类型（流式/非流式）
+    2. 统一内容提取：
+       - 流式响应：拼接所有delta.content
+       - 非流式响应：直接获取message.content
+    3. 元数据提取：
+       - 模型标识
+       - 使用量统计
+       - 请求ID
+
+    特殊处理：
+    - 流式响应中的部分结果缓存
+    - 非UTF-8字符的转义处理
+    - 大文本内容的分块处理
+
+    返回值结构：
+    {
+        "content": str,         # 完整响应内容
+        "model": str,           # 实际使用的模型
+        "usage": {              # 令牌使用情况
+            "prompt_tokens": int,
+            "completion_tokens": int,
+            "total_tokens": int
+        },
+        "request_id": str       # 本次请求的唯一ID
+    }
     """
 
     def parse(self, response: Any) -> Dict[str, Any]:

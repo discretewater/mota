@@ -1,8 +1,22 @@
 """
-custom_interface.py - LLM API 调用接口定义
+custom_interface.py - LLM API 接口协议定义
 
-本模块定义了用于调用各种 LLM API 的标准接口。
-包括 LLM API 调用接口和响应解析接口，为不同的 LLM 提供商提供统一的调用方式。
+本模块定义了两个核心接口：
+1. LLMCallerInterface: LLM API调用接口协议
+   - 规范API调用方法的参数和返回值
+   - 确保不同提供商实现统一的调用方式
+2. ResponseParserInterface: 响应解析接口协议
+   - 标准化不同API返回数据的解析流程
+   - 支持流式响应和普通响应的统一处理
+
+接口设计原则：
+- 类型安全：使用ABC抽象基类和类型注解
+- 扩展性：通过继承实现新提供商的支持
+- 兼容性：同时支持同步和异步调用模式
+- 可测试性：明确的接口定义便于mock测试
+
+重要提示：
+所有自定义LLM实现类必须严格遵循本模块定义的接口协议
 """
 
 from typing import Any, Dict, Union, Generator

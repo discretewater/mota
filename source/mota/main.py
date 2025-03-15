@@ -1,13 +1,30 @@
 """
-Mota - A Comprehensive LLM API Interaction Tool
+Mota - 全能大语言模型API交互工具
 
-This module provides a unified interface for interacting with various LLM APIs
-including OpenAI, Anthropic, Google's Gemini, GROQ, GROK, DeepSeek, Mistral,
-OpenRouter, and others. It supports configuration management, authentication handling,
-and customizable API interactions.
+本模块提供与多种大语言模型(LLM)API交互的统一接口，支持以下功能：
+1. 多提供商API集成：OpenAI、Anthropic、Gemini、GROQ、GROK、DeepSeek、Mistral、OpenRouter等
+2. 动态插件机制：支持加载自定义API调用器和响应解析器
+3. 检索增强生成(RAG)：集成知识库检索功能
+4. 统一配置管理：通过EDN格式配置文件管理所有参数
+5. 安全认证管理：支持多种密钥获取方式（环境变量、配置文件、authinfo文件等）
 
-This program is licensed under the GNU General Public License (GPL) version 3.
-Copyright (C) [year] [your name]
+主要功能模块：
+- 配置加载与验证
+- API密钥安全管理
+- 提示词模板格式化
+- 上下文知识检索
+- 多提供商API统一调用接口
+- 响应解析与结果提取
+
+典型使用场景：
+- 快速切换不同LLM服务提供商
+- 开发自定义LLM集成插件
+- 构建基于知识库的智能问答系统
+- 统一管理多个API密钥和配置参数
+
+版权声明：
+本程序遵循GNU通用公共许可证(GPL)第三版
+版权所有 (C) 2024 Mota开发团队
 """
 
 import os
