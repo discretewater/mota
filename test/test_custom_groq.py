@@ -36,18 +36,23 @@ from typing import Any, Dict, Generator, Union
 from unittest.mock import MagicMock, patch
 from mota.custom_interface import LLMCallerInterface
 
-# Import the module to be tested (source/mota/main.py)
+# Import the modules to be tested
 spec = importlib.util.spec_from_file_location("main_module", os.path.join(os.path.dirname(__file__), "../source/mota/main.py"))
 main_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(main_module)
+
+# Import core module
+core_spec = importlib.util.spec_from_file_location("core_module", os.path.join(os.path.dirname(__file__), "../source/mota/core.py"))
+core_module = importlib.util.module_from_spec(core_spec)
+core_spec.loader.exec_module(core_module)
 
 
 def test_get_llm_call_func_default():
     """
     测试在未提供自定义函数时，默认的 LLM API 调用函数是否被返回。
     """
-    func = main_module.get_llm_call_func(None)
-    assert func == main_module.default_llm_call
+    func = core_module.get_llm_call_func(None)
+    assert func == core_module.default_llm_call
 
 
 def test_get_llm_call_func_custom():
@@ -77,10 +82,10 @@ class DummyLLMCaller(LLMCallerInterface):
 """)
 
         # 使用临时模块路径调用get_llm_call_func
-        custom_func = main_module.get_llm_call_func(temp_module_path)
+        custom_func = core_module.get_llm_call_func(temp_module_path)
 
         # 验证返回的函数不是默认函数
-        assert custom_func != main_module.default_llm_call
+        assert custom_func != core_module.default_llm_call
 
         # 调用返回的函数并验证其行为
         with patch("mota.loader.load_module_from_path") as mock_load_module:
@@ -98,7 +103,7 @@ class DummyLLMCaller(LLMCallerInterface):
             mock_load_module.return_value = mock_module
 
             # 重新获取函数
-            custom_func = main_module.get_llm_call_func(temp_module_path)
+            custom_func = core_module.get_llm_call_func(temp_module_path)
 
             # 调用函数并验证结果
             result = custom_func("test_provider", "test_api_key", "test_prompt", {})

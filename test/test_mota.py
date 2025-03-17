@@ -11,7 +11,7 @@ from edn_format import Keyword
 from unittest.mock import patch, MagicMock, mock_open
 import json
 
-from mota.main import (
+from mota.core import (
     setup_logging,
     load_config,
     get_api_key,
@@ -109,7 +109,7 @@ def test_parse_response():
 def test_parse_response_custom_parser():
     """测试自定义响应解析器"""
     # 模拟自定义解析器模块
-    with patch("mota.main.load_custom_func") as mock_load_custom_func:
+    with patch("mota.core.load_custom_func") as mock_load_custom_func:
         # 创建一个模拟的解析函数
         def mock_parser(response):
             return {"custom_field": "custom_value"}
@@ -183,8 +183,8 @@ dummy_config = {
 }
 
 
-@patch("mota.main.load_config", return_value=dummy_config)
-@patch("mota.main.get_api_key", return_value="dummy_api_key")
+@patch("mota.core.load_config", return_value=dummy_config)
+@patch("mota.core.get_api_key", return_value="dummy_api_key")
 @patch("openai.OpenAI")
 def test_main_openai_success(mock_openai_cls, mock_get_api_key, mock_load_config):
     """
@@ -192,8 +192,8 @@ def test_main_openai_success(mock_openai_cls, mock_get_api_key, mock_load_config
     使用 mock 模拟 OpenAI API响应，并验证输出结果包含预期响应内容。
     """
     # 重置全局 openai_client 以确保测试隔离
-    import mota.main as main_mod
-    main_mod.openai_client = None
+    import mota.core as core_mod
+    core_mod.openai_client = None
 
     # 构造假的 OpenAI 客户端实例及其响应
     fake_client_instance = MagicMock()
@@ -216,8 +216,8 @@ def test_main_openai_success(mock_openai_cls, mock_get_api_key, mock_load_config
     assert "Fake response from OpenAI" in result.output
 
 
-@patch("mota.main.load_config", return_value=dummy_config)
-@patch("mota.main.get_api_key", return_value="dummy_api_key")
+@patch("mota.core.load_config", return_value=dummy_config)
+@patch("mota.core.get_api_key", return_value="dummy_api_key")
 @patch("openai.OpenAI")
 def test_main_openai_custom_params(mock_openai_cls, mock_get_api_key, mock_load_config):
     """
@@ -225,8 +225,8 @@ def test_main_openai_custom_params(mock_openai_cls, mock_get_api_key, mock_load_
     验证自定义参数是否正确合并到API请求中。
     """
     # 重置全局 openai_client 以确保测试隔离
-    import mota.main as main_mod
-    main_mod.openai_client = None
+    import mota.core as core_mod
+    core_mod.openai_client = None
 
     fake_client_instance = MagicMock()
     fake_chat = MagicMock()
@@ -257,8 +257,8 @@ def test_main_openai_custom_params(mock_openai_cls, mock_get_api_key, mock_load_
     assert "Fake response from OpenAI" in result.output
 
 
-@patch("mota.main.load_config", return_value=dummy_config)
-@patch("mota.main.get_api_key", return_value="dummy_api_key")
+@patch("mota.core.load_config", return_value=dummy_config)
+@patch("mota.core.get_api_key", return_value="dummy_api_key")
 @patch("openai.OpenAI")
 def test_main_openai_field_extraction(mock_openai_cls, mock_get_api_key, mock_load_config):
     """
@@ -266,8 +266,8 @@ def test_main_openai_field_extraction(mock_openai_cls, mock_get_api_key, mock_lo
     当使用 --fields 参数时，输出应只包含指定的字段。
     """
     # 重置全局 openai_client 以确保测试隔离
-    import mota.main as main_mod
-    main_mod.openai_client = None
+    import mota.core as core_mod
+    core_mod.openai_client = None
 
     fake_client_instance = MagicMock()
     fake_chat = MagicMock()

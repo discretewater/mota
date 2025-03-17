@@ -30,7 +30,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 from edn_format import Keyword
 
-from mota.main import (
+from mota.core import (
     retrieve_context_knowledge,
     setup_logging
 )
@@ -51,9 +51,9 @@ def test_retrieve_context_knowledge_directory_exists(setup_test_environment):
     knowledge_dir = setup_test_environment
 
     # 模拟DirectoryLoader和FAISS
-    with patch("mota.main.DirectoryLoader") as mock_loader, \
-            patch("mota.main.HuggingFaceEmbeddings") as mock_embeddings, \
-            patch("mota.main.FAISS") as mock_faiss:
+    with patch("mota.core.DirectoryLoader") as mock_loader, \
+            patch("mota.core.HuggingFaceEmbeddings") as mock_embeddings, \
+            patch("mota.core.FAISS") as mock_faiss:
 
         # 设置模拟对象的行为
         mock_documents = [MagicMock(page_content=f"测试文档内容 {i}") for i in range(3)]
@@ -107,8 +107,8 @@ def test_retrieve_context_knowledge_with_real_files(setup_test_environment):
         pytest.skip(f"测试目录不存在: {knowledge_dir}")
 
     # 模拟FAISS和嵌入模型，但使用实际的DirectoryLoader加载文件
-    with patch("mota.main.HuggingFaceEmbeddings") as mock_embeddings, \
-            patch("mota.main.FAISS") as mock_faiss:
+    with patch("mota.core.HuggingFaceEmbeddings") as mock_embeddings, \
+            patch("mota.core.FAISS") as mock_faiss:
 
         # 设置模拟对象的行为
         mock_embeddings_instance = MagicMock()
@@ -133,9 +133,9 @@ def test_retrieve_context_knowledge_with_real_files(setup_test_environment):
         assert "量子理论的重要应用" in result[1]
 
 
-@patch("mota.main.DirectoryLoader")
-@patch("mota.main.HuggingFaceEmbeddings")
-@patch("mota.main.FAISS")
+@patch("mota.core.DirectoryLoader")
+@patch("mota.core.HuggingFaceEmbeddings")
+@patch("mota.core.FAISS")
 def test_retrieve_context_knowledge_integration(mock_faiss, mock_embeddings, mock_loader, setup_test_environment):
     """测试知识库检索的集成功能"""
     knowledge_dir = setup_test_environment
@@ -168,71 +168,80 @@ def test_retrieve_context_knowledge_integration(mock_faiss, mock_embeddings, moc
         assert result[i] == f"相关量子力学内容 {i}"
 
 
-@patch("mota.main.default_parse")
+@patch("mota.main.retrieve_context_knowledge")
 @patch("mota.main.load_config")
 @patch("mota.main.get_api_key")
 @patch("mota.main.get_llm_call_func")
-@patch("mota.main.retrieve_context_knowledge")
-def test_main_with_knowledge_dir(mock_retrieve, mock_get_llm_call, mock_get_api_key, mock_load_config, mock_parse_response):
-    """测试主函数中的知识库检索集成"""
+@patch("mota.main.get_parser_func")
+def test_main_with_rag_integration(mock_get_parser_func, mock_get_llm_call_func,
+                                   mock_get_api_key, mock_load_config,
+                                   mock_retrieve_context_knowledge):
+    """测试主函数中的知识库检索集成（RAG）功能"""
     from typer.testing import CliRunner
     from mota.main import cli
 
     # 设置模拟对象
-    mock_load_config.return_value = {
-        Keyword('logging'): {Keyword('level'): "DEBUG"},
-        Keyword('llm'): {
-            Keyword('providers'): {
-                Keyword('groq'): {
-                    Keyword('model'): "deepseek-r1-distill-llama-70b"
+    mock_config = {
+        Keyword("logging"): {"level": "DEBUG"},
+        Keyword("llm"): {
+            Keyword("providers"): {
+                Keyword("openai"): {
+                    Keyword("model"): "gpt-4"
                 }
             },
-            Keyword('temperature'): 0.7,
-            Keyword('stream'): True,
-            Keyword('max_tokens'): 1000
+            Keyword("temperature"): 0.7,
+            Keyword("stream"): True,
+            Keyword("max_tokens"): 1000
         }
     }
+    mock_load_config.return_value = mock_config
     mock_get_api_key.return_value = "test-api-key"
 
     # 模拟知识库检索结果
-    mock_retrieve.return_value = ["量子力学是物理学的分支", "量子理论有广泛的应用"]
+    mock_retrieve_context_knowledge.return_value = [
+        "量子力学是物理学的一个分支，描述微观粒子的行为。",
+        "量子物理不同于宏观物理。",
+        "量子纠缠是量子力学中的一种现象，指两个或多个粒子的量子状态相互关联。"
+    ]
 
-    # 模拟LLM调用函数和响应
+    # 模拟LLM调用和响应解析
     mock_llm_call = MagicMock()
-    mock_response = MagicMock()
-    mock_llm_call.return_value = mock_response
-    mock_get_llm_call.return_value = mock_llm_call
+    mock_llm_call.return_value = "模拟的LLM响应"
+    mock_get_llm_call_func.return_value = mock_llm_call
 
-    # 模拟响应解析
-    mock_parsed_response = {"content": "这是关于量子力学的回答"}
-    mock_parse_response.return_value = mock_parsed_response
-    mock_llm_call.return_value = mock_response
+    mock_parser = MagicMock()
+    mock_parser.return_value = {"content": "量子力学是研究原子和亚原子尺度现象的物理学分支，与相对论共同构成现代物理学的两大支柱。它通过概率和波函数描述微观粒子的行为，解释了经典物理学无法解释的现象，并在多个领域有广泛应用。"}
+    mock_get_parser_func.return_value = mock_parser
 
-    # 使用CliRunner执行命令
+    # 使用CliRunner调用主函数
     runner = CliRunner()
     result = runner.invoke(cli, [
-        "--log-level", "DEBUG",
-        "--provider", "groq",
-        "--prompt", "请用中文回答",
-        "--knowledge-dir", "test/fixture/knowledge",
-        "解释量子力学。"
+        "--provider", "openai",
+        "--model", "gpt-x",
+        "--prompt", "你是一个量子物理学专家。",
+        "--knowledge-dir", "/path/to/knowledge",
+        "请解释量子力学。"
     ])
 
-    # 验证知识库检索函数被调用
-    # 直接检查调用参数
-    assert mock_retrieve.called, "retrieve_context_knowledge 函数未被调用"
-    knowledge_dir_arg = mock_retrieve.call_args[0][0]
-    query_arg = mock_retrieve.call_args[0][1]
+    # 验证知识库检索是否被调用
+    mock_retrieve_context_knowledge.assert_called_once()
+    knowledge_dir_arg = mock_retrieve_context_knowledge.call_args[0][0]
+    query_arg = mock_retrieve_context_knowledge.call_args[0][1]
+    assert knowledge_dir_arg == "/path/to/knowledge"
+    assert "你是一个量子物理学专家。" in query_arg
+    assert "请解释量子力学。" in query_arg
 
-    assert "test/fixture/knowledge" in knowledge_dir_arg
-    assert "请用中文回答 解释量子力学。" in query_arg
+    # 验证LLM调用中是否包含了检索到的上下文
+    llm_call_args = mock_llm_call.call_args
+    formatted_prompt = llm_call_args[0][2]  # 第三个位置参数是formatted_prompt
 
-    # 验证LLM调用函数接收到了增强的提示词
-    prompt_arg = mock_llm_call.call_args[0][2]
-    assert "请用中文回答" in prompt_arg
-    assert "参考以下相关信息" in prompt_arg
-    assert "量子力学是物理学的分支" in prompt_arg
-    assert "量子理论有广泛的应用" in prompt_arg
+    # 验证格式化后的提示词中包含了检索到的上下文
+    assert "你是一个量子物理学专家。" in formatted_prompt
+    assert "量子力学是物理学的一个分支" in formatted_prompt
+    assert "量子纠缠是量子力学中的一种现象" in formatted_prompt
 
-    # 验证输出包含解析后的响应
-    assert "这是关于量子力学的回答" in result.output
+    # 验证响应解析是否被调用
+    mock_parser.assert_called_once()
+
+    # 验证命令执行成功
+    assert result.exit_code == 0

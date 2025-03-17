@@ -20,7 +20,7 @@ custom_groq.py - GROQ API 集成实现
 
 版本兼容性：
 - API版本: 2023-10-30
-- 支持模型: 
+- 支持模型:
   - llama2-70b-4096
   - mixtral-8x7b-32768
   - deepseek-r1-distill-llama-70b
