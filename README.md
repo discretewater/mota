@@ -27,8 +27,6 @@ Mota 是一个用于与各种主要大语言模型（LLM）API服务交互的综
 - **企业级功能**：
   - 双模式响应处理（流式/非流式）
   - 智能参数转换与校验
-  - 连接池复用与压缩传输
-  - 请求签名与内容过滤
 
 - **开发者友好**：
   - 详尽的日志记录与调试信息
@@ -54,11 +52,65 @@ pip install -e .
 
 ### 基础示例
 ```bash
-# 使用 OpenAI 进行交互
-mota --provider openai --model gpt-4 "请解释量子纠缠"
+# 使用GROQ
+mota --log-level 'DEBUG' --provider=groq --custom-caller=source/mota/custom_groq.py --custom-parser=source/mota/custom_groq.py --knowledge-dir test/fixture/knowledge --prompt "无与伦比的科技大师，你好！我需要你的帮助。" "解释量子力学。"
+```
 
-# 使用 GROQ 的流式响应模式
-mota --provider groq --stream true "如何构建神经网络？"
+### Python API 使用示例
+```python
+from mota import seek
+
+response = seek(
+    provider="groq",
+    custom_caller="source/mota/custom_groq.py",
+    custom_parser="source/mota/custom_groq.py",
+    model="deepseek-r1-distill-llama-70b",
+    prompt="无与伦比的科技大师，你好！我需要你的帮助。",
+    message="详细说明Transformer架构。",
+    fields=["content", "usage"]
+)
+
+print(">>> ", response)
+```
+
+### Seek API 参数说明
+
+| 参数             | 类型                  | 默认值     | 说明                                                                 |
+|------------------|-----------------------|------------|---------------------------------------------------------------------|
+| provider         | str                   | "openai"   | 支持的LLM提供商: openai/anthropic/groq/mistral/deepseek/openrouter |
+| model            | Optional[str]         | None       | 当为None时自动使用配置文件中的默认模型                             |
+| stream           | bool                  | True       | 流式响应模式，建议在CLI中关闭，在API中启用                         |
+| knowledge_dir    | Optional[str]         | None       | 启用RAG检索时需指向包含.txt/.pdf/.docx等文件的目录                 |
+| fields           | Optional[List[str]]   | None       | 支持嵌套字段提取，如 ["content", "usage.total_tokens"]             |
+| custom_caller    | Optional[str]         | None       | 格式："/path/to/module.py:ClassName"                               |
+| user_query       | Optional[List[str]]   | None       | 支持追加多个查询参数，自动拼接至主消息后                           |
+
+### 异步调用与错误处理
+```python
+import asyncio
+from mota import seek
+from mota.core import LLMError
+
+# 异步调用示例
+async def async_seek():
+    response = await seek(
+        provider="groq",
+        message="异步编程的优势",
+        stream=False,
+        async_mode=True
+    )
+    print(response['content'])
+
+asyncio.run(async_seek())
+
+# 错误处理示例
+try:
+    response = seek(provider="openai", model="gpt-5")  # 不存在的模型
+except LLMError as e:
+    print(f"API错误代码: {e.code}")
+    print(f"错误详情: {e.details}")
+except Exception as e:
+    print(f"系统错误: {str(e)}")
 ```
 
 ### 高级功能示例
