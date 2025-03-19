@@ -23,4 +23,6 @@ Mota - 大语言模型交互核心包
 """
 
 __version__ = "1.0.0"
-__all__ = ['main', 'loader', 'custom_interface', 'custom_groq', 'custom_anthropic']
+__all__ = ['main', 'loader', 'custom_interface', 'custom_groq', 'custom_anthropic', 'seek']
+
+from .seek import seek

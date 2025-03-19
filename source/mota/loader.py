@@ -59,11 +59,9 @@ def load_module_from_path(module_name: str, file_path: str):
         spec.loader.exec_module(module)
         return module
     except FileNotFoundError:
-        print(f"错误：文件 '{file_path}' 不存在。")
-        sys.exit(1)
+        raise ImportError(f"文件 '{file_path}' 不存在")
     except Exception as e:
-        print(f"错误：加载模块失败 - {str(e)}")
-        sys.exit(1)
+        raise ImportError(f"加载模块失败 - {str(e)}")
 
 
 def find_implementor(module, interface: Type[ABC]) -> Type[ABC] | None:

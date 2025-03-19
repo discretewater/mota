@@ -168,11 +168,11 @@ def test_retrieve_context_knowledge_integration(mock_faiss, mock_embeddings, moc
         assert result[i] == f"相关量子力学内容 {i}"
 
 
-@patch("mota.main.retrieve_context_knowledge")
-@patch("mota.main.load_config")
-@patch("mota.main.get_api_key")
-@patch("mota.main.get_llm_call_func")
-@patch("mota.main.get_parser_func")
+@patch("mota.seek.retrieve_context_knowledge")
+@patch("mota.seek.load_config")
+@patch("mota.seek.get_api_key")
+@patch("mota.seek.get_llm_call_func")
+@patch("mota.seek.get_parser_func")
 def test_main_with_rag_integration(mock_get_parser_func, mock_get_llm_call_func,
                                    mock_get_api_key, mock_load_config,
                                    mock_retrieve_context_knowledge):

@@ -410,6 +410,9 @@ def retrieve_context_knowledge(directory_path: str, query: str, top_k: int = 5) 
     documents = loader.load()
     logger.info(f"共加载到 {len(documents)} 个文档。")
 
+    if len(documents) == 0:
+        raise ValueError(f"目录 {directory_path} 未加载到任何文档，请检查文件格式和内容")
+
     # 2. 初始化嵌入模型
     # 使用HuggingFaceEmbeddings的嵌入模型进行向量化
     embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")  # "all-MiniLM-L6-v2"（小）和"all-mpnet-base-v2"（大）

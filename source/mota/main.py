@@ -29,12 +29,10 @@ Mota - 全能大语言模型API交互工具
 
 from typing import Optional, List
 import typer
-from edn_format import Keyword
 
 # 从core模块导入所有核心功能
-from mota.core import (
-    setup_logging, load_config, get_api_key, format_prompt, extract_fields,
-    get_llm_call_func, get_parser_func, retrieve_context_knowledge,
+from mota.core import (  # noqa: F401
+    get_llm_call_func, get_parser_func,
     logger
 )
 
@@ -77,90 +75,34 @@ def main(
     程序入口点，与LLM进行对话
     """
     try:
-        # 设置日志
-        setup_logging(log_level, log_output)
-        logger.debug("日志系统已初始化")
-
-        # 处理用户查询参数作为用户消息
-        actual_user_message = message
-
-        if user_query:
-            logger.debug(f"检测到用户查询参数: {user_query}")
-            # 将用户查询添加到用户消息后面
-            actual_user_message = f"{actual_user_message} {' '.join(user_query)}"
-            logger.debug(f"合并后的用户消息: {actual_user_message}")
-
-        # 加载配置
-        config = load_config(config_path)
-        logger.debug(f"加载配置: {config}")
-
-        # 获取API密钥
-        api_key = get_api_key(provider)
-        logger.debug(f"获取到的API密钥: {api_key}")
-
-        # 配置请求参数
-        request_params = {
-            "model": model or config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())][Keyword('model')],
-            "temperature": temperature or config[Keyword('llm')][Keyword('temperature')],
-            "stream": stream if Keyword('stream') not in config[Keyword('llm')] else config[Keyword('llm')][Keyword('stream')],
-            "max_tokens": config[Keyword('llm')][Keyword('max_tokens')],
-            "message": actual_user_message  # 添加用户消息参数
-        }
-
         # 解析自定义参数
+        custom_params_dict = None
         if custom_params:
             import json
-            user_params = json.loads(custom_params)
-            request_params.update(user_params)
-            logger.debug(f"合并自定义请求参数: {user_params}")
+            custom_params_dict = json.loads(custom_params)
 
-        logger.debug(f"最终请求参数: {request_params}")
+        # 调用核心API函数
+        from mota.seek import seek
+        result = seek(
+            provider=provider,
+            model=model,
+            prompt=prompt,
+            message=message,
+            temperature=temperature,
+            stream=stream,
+            config_path=config_path,
+            log_level=log_level,
+            log_output=log_output,
+            custom_params=custom_params_dict,
+            fields=fields.split(',') if fields else None,
+            custom_caller=custom_caller,
+            custom_parser=custom_parser,
+            knowledge_dir=knowledge_dir,
+            user_query=user_query
+        )
 
-        # 格式化提示词
-        formatted_prompt = prompt
-
-        # 如果指定了知识库目录，则进行RAG检索
-        if knowledge_dir:
-            logger.info(f"检测到知识库目录: {knowledge_dir}，将进行RAG检索")
-            # 构建查询字符串，结合系统提示词和用户消息
-            query = f"{prompt} {actual_user_message}"
-            # 调用RAG检索函数获取相关上下文
-            try:
-                context_knowledge = retrieve_context_knowledge(knowledge_dir, query)
-                # 将检索到的上下文合并为一个字符串
-                context_text = "\n\n".join(context_knowledge)
-                # 将上下文添加到提示词中
-                formatted_prompt = f"{prompt}\n\n参考以下相关信息：\n\n{context_text}"
-                logger.info("成功添加RAG检索结果到提示词")
-                logger.debug(f"添加RAG后的提示词长度: {len(formatted_prompt)}")
-            except Exception as e:
-                logger.error(f"RAG检索失败: {e}")
-                # 如果RAG检索失败，仍使用原始提示词继续
-                logger.info("将使用原始提示词继续")
-
-        # 格式化最终提示词
-        formatted_prompt = format_prompt(formatted_prompt, **{})
-        logger.debug(f"格式化后的提示词: {formatted_prompt}")
-
-        # 调用 LLM API 的统一接口函数，根据配置参数和自定义函数实现调用逻辑
-        llm_call_func = get_llm_call_func(custom_caller)
-        response = llm_call_func(provider, api_key, formatted_prompt, request_params)
-
-        logger.debug(f"API响应: {response}")
-
-        # 获取解析器
-        parse_func = get_parser_func(custom_parser)
-        # 解析响应
-        parsed_response = parse_func(response)
-        logger.debug(f"解析后的响应: {parsed_response}")
-
-        # 提取指定字段
-        if fields:
-            field_list = fields.split(',')
-            extracted = extract_fields(parsed_response, field_list)
-            print(extracted)
-        else:
-            print(parsed_response)
+        # 输出结果
+        print(result)
 
     except Exception as e:
         logger.error(f"聊天失败: {e}")
