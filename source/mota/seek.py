@@ -108,21 +108,49 @@ def seek(
 
         # 获取API密钥
         api_key = get_api_key(provider)
-        logger.debug(f"获取到的API密钥: {api_key}")
+        logger.debug("成功获取到API密钥")
 
-        # 配置请求参数
-        request_params = {
-            "model": model or config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())][Keyword('model')],
-            "temperature": temperature or config[Keyword('llm')][Keyword('temperature')],
-            "stream": stream if Keyword('stream') not in config[Keyword('llm')] else config[Keyword('llm')][Keyword('stream')],
-            "max_tokens": config[Keyword('llm')][Keyword('max_tokens')],
-            "message": actual_user_message  # 添加用户消息参数
-        }
+        # 配置请求参数，首先从配置文件获取基础参数
+        request_params = {}
+
+        # 从配置文件获取基础参数，注意处理可能的空值引用
+        try:
+            # 获取模型名称
+            if Keyword('llm') in config and Keyword('providers') in config[Keyword('llm')] and Keyword(provider.lower()) in config[Keyword('llm')][Keyword('providers')] and Keyword('model') in config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())]:
+                request_params["model"] = config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())][Keyword('model')]
+
+            # 获取温度参数
+            if Keyword('llm') in config and Keyword('temperature') in config[Keyword('llm')]:
+                request_params["temperature"] = config[Keyword('llm')][Keyword('temperature')]
+
+            # 获取流式响应设置
+            if Keyword('llm') in config and Keyword('stream') in config[Keyword('llm')]:
+                request_params["stream"] = config[Keyword('llm')][Keyword('stream')]
+
+            # 获取最大令牌数
+            if Keyword('llm') in config and Keyword('max_tokens') in config[Keyword('llm')]:
+                request_params["max_tokens"] = config[Keyword('llm')][Keyword('max_tokens')]
+        except Exception as e:
+            logger.warning(f"从配置文件获取参数时出现异常: {e}，将使用默认值")
+
+        # 添加用户消息参数
+        request_params["message"] = actual_user_message
 
         # 解析自定义参数
         if custom_params:
             request_params.update(custom_params)
             logger.debug(f"合并自定义请求参数: {custom_params}")
+
+        # 将非None的seek函数参数合并入request_params，这些参数优先级最高
+        seek_params = {
+            "model": model,
+            "temperature": temperature,
+            "stream": stream
+        }
+        for key, value in seek_params.items():
+            if value is not None:
+                request_params[key] = value
+                logger.debug(f"使用seek函数参数 {key}={value}")
 
         logger.debug(f"最终请求参数: {request_params}")
 
