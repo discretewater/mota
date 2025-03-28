@@ -136,12 +136,7 @@ def seek(
         # 添加用户消息参数
         request_params["message"] = actual_user_message
 
-        # 解析自定义参数
-        if custom_params:
-            request_params.update(custom_params)
-            logger.debug(f"合并自定义请求参数: {custom_params}")
-
-        # 将非None的seek函数参数合并入request_params，这些参数优先级最高
+        # 将seek函数参数合并入request_params，这些参数优先级最高
         seek_params = {
             "model": model,
             "temperature": temperature,
@@ -151,6 +146,11 @@ def seek(
             if value is not None:
                 request_params[key] = value
                 logger.debug(f"使用seek函数参数 {key}={value}")
+
+        # 解析自定义参数
+        if custom_params:
+            request_params.update(custom_params)
+            logger.debug(f"合并自定义请求参数: {custom_params}")
 
         logger.debug(f"最终请求参数: {request_params}")
 

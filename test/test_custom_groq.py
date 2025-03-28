@@ -35,6 +35,7 @@ import importlib.util
 from typing import Any, Dict, Generator, Union
 from unittest.mock import MagicMock, patch
 from mota.custom_interface import LLMCallerInterface
+from groq.types.chat import ChatCompletion
 
 # Import the modules to be tested
 spec = importlib.util.spec_from_file_location("main_module", os.path.join(os.path.dirname(__file__), "../source/mota/main.py"))
@@ -232,16 +233,41 @@ class MockStreamChunk:
     def __init__(self, content="", model=None, usage=None):
         self.choices = [MagicMock(delta=MagicMock(content=content))]
         self.model = model
-        self.usage = usage
+        # 构造 x_groq 嵌套结构
+        self.x_groq = MagicMock()
+        if usage:
+            # 创建带 model_dump() 方法的 usage 对象
+            usage_mock = MagicMock()
+            usage_mock.model_dump = MagicMock(return_value=usage)
+            self.x_groq.usage = usage_mock
+        else:
+            self.x_groq = None
 
 
-class MockCompletion:
-    """模拟GROQ非流式响应"""
+def create_mock_completion(content="this is test content", model="test-model", usage=None):
+    # 创建基于ChatCompletion结构的MagicMock
+    mock_response = MagicMock(spec=ChatCompletion)  # 关键点：spec约束
 
-    def __init__(self, content="test content", model="test-model", usage=None):
-        self.choices = [MagicMock(message=MagicMock(content=content))]
-        self.model = model
-        self.usage = usage
+    # 设置 choices 结构
+    mock_response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content=content,
+                to_dict=MagicMock(return_value={"content": content})
+            )
+        )
+    ]
+
+    mock_response.model = model
+
+    # 设置 usage 字段
+    if usage is not None:
+        mock_response.usage = MagicMock()
+        mock_response.usage.model_dump = MagicMock(return_value=usage)
+    else:
+        mock_response.usage = None
+
+    return mock_response
 
 
 def test_parse_groq_response_non_stream():
@@ -254,9 +280,7 @@ def test_parse_groq_response_non_stream():
     custom_groq = importlib.util.module_from_spec(groq_spec)
     groq_spec.loader.exec_module(custom_groq)
 
-    mock_usage = MagicMock()
-    mock_usage._asdict.return_value = {"total_tokens": 100}
-    response = MockCompletion(usage=mock_usage)
+    response = create_mock_completion(content="test content", model="test-model", usage={"total_tokens": 100})
 
     # 使用类实例测试
     parser = custom_groq.GroqResponseParser()
@@ -278,12 +302,10 @@ def test_parse_groq_response_stream():
     groq_spec.loader.exec_module(custom_groq)
 
     chunks = [
-        MockStreamChunk(content="Hello", model="llama2-70b",
-                        usage=MagicMock(_asdict=lambda: {"total_tokens": 50})),
-        MockStreamChunk(content=" World",
-                        usage=MagicMock(_asdict=lambda: {"total_tokens": 75})),
+        MockStreamChunk(content="Hello", model="llama2-70b"),
+        MockStreamChunk(content=" World"),
         MockStreamChunk(content="!",
-                        usage=MagicMock(_asdict=lambda: {"total_tokens": 100}))
+                        usage={"total_tokens": 128})
     ]
 
     # 使用类实例测试
@@ -292,7 +314,7 @@ def test_parse_groq_response_stream():
 
     assert result["content"] == "Hello World!"
     assert result["model"] == "llama2-70b"
-    assert result["usage"]["total_tokens"] == 225  # 50 + 75 + 100
+    assert result["usage"]["total_tokens"] == 128
 
 
 def test_parse_groq_response_error_handling(caplog):
@@ -393,12 +415,10 @@ def test_combined_llm_call_and_parser():
         mock_client.chat.completions.create = mock_completions
 
         # 创建一个模拟的非流式响应
-        mock_usage = MagicMock()
-        mock_usage._asdict.return_value = {"total_tokens": 150}
-        mock_response = MockCompletion(
+        mock_response = create_mock_completion(
             content="这是一个测试响应",
             model="deepseek-r1-distill-llama-70b",
-            usage=mock_usage
+            usage={"total_tokens": 150}
         )
         mock_completions.return_value = mock_response
 

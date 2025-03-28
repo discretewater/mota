@@ -45,6 +45,7 @@ custom_groq.py - GROQ API 集成实现
 import logging
 from typing import Any, Dict, Generator, Union
 from groq import Groq
+from groq.types.chat import ChatCompletion
 
 from mota.custom_interface import LLMCallerInterface, ResponseParserInterface
 
@@ -115,6 +116,11 @@ class GroqLLMCaller(LLMCallerInterface):
         top_p = request_params.get("top_p", 0.62)
         stop = request_params.get("stop", None)
         user_message = request_params.get("message", "")
+
+        # 要求JSON格式时，“stream”必须为“False”
+        if stream and request_params.get("response_format", {}).get("type") == "json_object":
+            stream = False
+            logger.info("“stream”被置为“False”：要求响应格式为JSON格式时，“stream”必须为“False”。")
 
         # 记录 API 调用参数（不包括敏感信息）
         logger.info(f"调用 GROQ API，模型: {model}, 温度: {temperature}, 流模式: {stream}")
@@ -213,33 +219,36 @@ class GroqResponseParser(ResponseParserInterface):
             {'content': '...', 'model': 'llama2-70b', 'usage': {'total_tokens': 100}}
         """
         try:
+            # 处理非流式响应
+            if isinstance(response, ChatCompletion):
+                return {
+                    'content': response.choices[0].message.content,
+                    'model': response.model,
+                    'usage': response.usage.model_dump() if hasattr(response, 'usage') and response.usage else {}
+                }
             # 处理流式响应
-            if hasattr(response, '__iter__') and not hasattr(response, 'choices'):
+            else:
                 full_content = ""
                 model = ""
                 usage = {}
                 for chunk in response:
-                    if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices[0].delta
-                        if delta and delta.content:
-                            full_content += delta.content
-                    if not model and hasattr(chunk, 'model'):
-                        model = chunk.model
-                    # 累积usage统计信息（流式响应中每个chunk可能有部分统计）
-                    if hasattr(chunk, 'usage') and chunk.usage:
-                        chunk_usage = chunk.usage._asdict()
-                        usage = {k: chunk_usage.get(k, 0) + usage.get(k, 0) for k in set(chunk_usage) | set(usage)}
+                    # 处理内容增量
+                    if getattr(chunk, 'choices', None) and len(chunk.choices) > 0:
+                        delta = getattr(chunk.choices[0], 'delta', None)
+                        if delta:
+                            full_content += (getattr(delta, 'content', '') or '')
+                    if not model:  # 仅首次获取
+                        model = getattr(chunk, 'model', "")
+                    # usage仅取最后一次
+                    x_groq = getattr(chunk, 'x_groq', None)
+                    if x_groq and hasattr(x_groq, 'usage') and x_groq.usage:
+                        usage = x_groq.usage.model_dump()
+                if not full_content:
+                    raise Exception("未能成功解析出GROQ响应主要内容")
                 return {
                     'content': full_content,
                     'model': model,
                     'usage': usage
-                }
-            # 处理非流式响应
-            else:
-                return {
-                    'content': response.choices[0].message.content,
-                    'model': response.model,
-                    'usage': response.usage._asdict() if (hasattr(response, 'usage') and response.usage) else {}
                 }
         except Exception as e:
             logger.error(f"解析GROQ响应失败: {e}")
