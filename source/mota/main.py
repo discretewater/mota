@@ -28,6 +28,7 @@ Mota - 全能大语言模型API交互工具
 """
 
 from typing import Optional, List
+from pathlib import Path
 import typer
 
 # 从core模块导入所有核心功能
@@ -66,8 +67,8 @@ def main(
     log_output: str = typer.Option("stdout", help="日志输出目标", show_default=True),
     custom_params: Optional[str] = typer.Option(None, help="自定义聊天请求参数，使用JSON格式"),
     fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔"),
-    custom_caller: Optional[str] = typer.Option(None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
-    custom_parser: Optional[str] = typer.Option(None, help="自定义响应解析函数路径，格式为 模块名:函数名", show_default=False),
+    custom_caller: Optional[Path] = typer.Option(None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
+    custom_parser: Optional[Path] = typer.Option(None, help="自定义响应解析函数路径，格式为 模块名:函数名", show_default=False),
     knowledge_dir: Optional[str] = typer.Option(None, help="知识库目录路径，用于RAG检索增强生成", show_default=False),
     user_query: Optional[List[str]] = typer.Argument(None, help="附加的用户查询，将会附加到主要用户消息后")
 ) -> None:

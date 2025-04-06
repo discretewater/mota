@@ -27,17 +27,18 @@ loader.py - 动态模块加载器
 import importlib.util
 import sys
 from typing import Type
+from pathlib import Path
 from abc import ABC
 import os
 
 
-def load_module_from_path(module_name: str, file_path: str):
+def load_module_from_path(module_name: str, file_path: Path):
     """
     根据文件路径加载Python模块。
 
     Args:
         module_name (str): 指定加载模块的名称
-        file_path (str): 用户提供的Python文件路径
+        file_path (Path): 用户提供的Python文件路径
 
     Returns:
         module: 加载成功的模块对象

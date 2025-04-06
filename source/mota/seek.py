@@ -24,6 +24,7 @@ seek.py - Mota API 核心函数模块
 """
 
 from typing import Optional, List, Dict, Any
+from pathlib import Path
 
 # 从 core 模块导入所有核心功能
 from mota.core import (
@@ -47,8 +48,8 @@ def seek(
     log_output: str = "stdout",
     custom_params: Optional[Dict[str, Any]] = None,
     fields: Optional[List[str]] = None,
-    custom_caller: Optional[str] = None,
-    custom_parser: Optional[str] = None,
+    custom_caller: Optional[Path] = None,
+    custom_parser: Optional[Path] = None,
     knowledge_dir: Optional[str] = None,
     user_query: Optional[List[str]] = None
 ) -> Dict[str, Any]:

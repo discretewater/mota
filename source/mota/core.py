@@ -274,7 +274,7 @@ def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request
 
 def load_custom_func(
     module_name: str,
-    module_path: str,
+    module_path: Path,
     interface_class: type,
     method_name: str
 ) -> Callable:
@@ -286,7 +286,7 @@ def load_custom_func(
 
     Args:
         module_name (str): 模块名，例如 "custom_caller"。
-        module_path (str): 模块路径，用户提供的自定义模块文件路径。
+        module_path (Path): 模块路径，用户提供的自定义模块文件路径。
         interface_class (type): 要查找的接口类，例如 LLMCallerInterface。
         method_name (str): 要获取的方法名，例如 "call"。
 
@@ -314,7 +314,7 @@ def load_custom_func(
         raise
 
 
-def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
+def get_llm_call_func(custom_caller: Optional[Path]) -> Callable:
     """
     获取 LLM API 调用函数.
 
@@ -346,7 +346,7 @@ def get_llm_call_func(custom_caller: Optional[str]) -> Callable:
         return default_llm_call
 
 
-def get_parser_func(custom_parser: str) -> Callable:
+def get_parser_func(custom_parser: Optional[Path]) -> Callable:
     """
     获取响应解析函数
 
@@ -356,7 +356,7 @@ def get_parser_func(custom_parser: str) -> Callable:
 
 
     Args:
-        custom_parser (str): 用户自定义函数路径。
+        custom_parser (Option[Path]): 用户自定义函数路径。
 
     Returns:
         Callable: 实现 ResponseParserInterface 的解析函数
