@@ -60,7 +60,12 @@ def test_seek_basic_functionality(
     mock_get_llm_call_func.return_value = mock_llm_call
 
     # 模拟响应解析函数
-    mock_parser = MagicMock(return_value={"content": "测试响应", "model": "gpt-4", "usage": {"total_tokens": 10}})
+    mock_parser = MagicMock(
+        return_value={
+            "content": "测试响应",
+            "model": "gpt-4",
+            "usage": {
+                "total_tokens": 10}})
     mock_get_parser_func.return_value = mock_parser
 
     # 调用 seek 函数
@@ -112,7 +117,12 @@ def test_seek_with_custom_params(
     mock_get_llm_call_func.return_value = mock_llm_call
 
     # 模拟响应解析函数
-    mock_parser = MagicMock(return_value={"content": "测试响应", "model": "gpt-4", "usage": {"total_tokens": 10}})
+    mock_parser = MagicMock(
+        return_value={
+            "content": "测试响应",
+            "model": "gpt-4",
+            "usage": {
+                "total_tokens": 10}})
     mock_get_parser_func.return_value = mock_parser
 
     # 自定义参数
@@ -227,7 +237,12 @@ def test_seek_with_knowledge_dir(
     mock_get_llm_call_func.return_value = mock_llm_call
 
     # 模拟响应解析函数
-    mock_parser = MagicMock(return_value={"content": "测试响应", "model": "gpt-4", "usage": {"total_tokens": 10}})
+    mock_parser = MagicMock(
+        return_value={
+            "content": "测试响应",
+            "model": "gpt-4",
+            "usage": {
+                "total_tokens": 10}})
     mock_get_parser_func.return_value = mock_parser
 
     # 模拟知识库检索结果
@@ -284,7 +299,8 @@ def test_seek_error_handling(
     mock_get_api_key.return_value = "test-api-key"
 
     # 模拟 LLM 调用函数抛出异常
-    mock_get_llm_call_func.return_value = MagicMock(side_effect=Exception("API 调用失败"))
+    mock_get_llm_call_func.return_value = MagicMock(
+        side_effect=Exception("API 调用失败"))
 
     # 验证异常被正确传递
     with pytest.raises(Exception) as excinfo:

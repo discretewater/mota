@@ -292,10 +292,10 @@ def default_llm_call(provider: str,
 
 
 def load_custom_func(
-    module_name: str,
-    module_path: Path,
-    interface_class: type,
-    method_name: str
+        module_name: str,
+        module_path: Path,
+        interface_class: type,
+        method_name: str
 ) -> Callable:
     """
     加载用户自定义函数。

@@ -118,12 +118,16 @@ class GroqLLMCaller(LLMCallerInterface):
         user_message = request_params.get("message", "")
 
         # 要求JSON格式时，“stream”必须为“False”
-        if stream and request_params.get("response_format", {}).get("type") == "json_object":
+        if stream and request_params.get(
+            "response_format",
+                {}).get("type") == "json_object":
             stream = False
-            logger.info("“stream”被置为“False”：要求响应格式为JSON格式时，“stream”必须为“False”。")
+            logger.info(
+                "“stream”被置为“False”：要求响应格式为JSON格式时，“stream”必须为“False”。")
 
         # 记录 API 调用参数（不包括敏感信息）
-        logger.info(f"调用 GROQ API，模型: {model}, 温度: {temperature}, 流模式: {stream}")
+        logger.info(f"调用 GROQ API，模型: {model}, 温度: {
+                    temperature}, 流模式: {stream}")
 
         # 根据 GROQ 的预期格式构建消息
         # GROQ 期望的消息格式为 [{role: "system"/"user", content: "..."}]
@@ -224,8 +228,9 @@ class GroqResponseParser(ResponseParserInterface):
                 return {
                     'content': response.choices[0].message.content,
                     'model': response.model,
-                    'usage': response.usage.model_dump() if hasattr(response, 'usage') and response.usage else {}
-                }
+                    'usage': response.usage.model_dump() if hasattr(
+                        response,
+                        'usage') and response.usage else {}}
             # 处理流式响应
             else:
                 full_content = ""
@@ -233,10 +238,13 @@ class GroqResponseParser(ResponseParserInterface):
                 usage = {}
                 for chunk in response:
                     # 处理内容增量
-                    if getattr(chunk, 'choices', None) and len(chunk.choices) > 0:
+                    if getattr(
+                            chunk, 'choices', None) and len(
+                            chunk.choices) > 0:
                         delta = getattr(chunk.choices[0], 'delta', None)
                         if delta:
-                            full_content += (getattr(delta, 'content', '') or '')
+                            full_content += (getattr(delta,
+                                             'content', '') or '')
                     if not model:  # 仅首次获取
                         model = getattr(chunk, 'model', "")
                     # usage仅取最后一次

@@ -56,7 +56,9 @@ def test_retrieve_context_knowledge_directory_exists(setup_test_environment):
             patch("mota.core.FAISS") as mock_faiss:
 
         # 设置模拟对象的行为
-        mock_documents = [MagicMock(page_content=f"测试文档内容 {i}") for i in range(3)]
+        mock_documents = [
+            MagicMock(
+                page_content=f"测试文档内容 {i}") for i in range(3)]
         mock_loader_instance = MagicMock()
         mock_loader_instance.load.return_value = mock_documents
         mock_loader.return_value = mock_loader_instance
@@ -65,7 +67,9 @@ def test_retrieve_context_knowledge_directory_exists(setup_test_environment):
         mock_embeddings.return_value = mock_embeddings_instance
 
         mock_vectorstore = MagicMock()
-        mock_retrieved_docs = [MagicMock(page_content=f"检索到的文档 {i}") for i in range(2)]
+        mock_retrieved_docs = [
+            MagicMock(
+                page_content=f"检索到的文档 {i}") for i in range(2)]
         mock_vectorstore.similarity_search.return_value = mock_retrieved_docs
         mock_faiss.from_documents.return_value = mock_vectorstore
 
@@ -77,7 +81,8 @@ def test_retrieve_context_knowledge_directory_exists(setup_test_environment):
         mock_loader.assert_called_once_with(knowledge_dir, recursive=True)
         mock_loader_instance.load.assert_called_once()
         mock_embeddings.assert_called_once_with(model_name="all-mpnet-base-v2")
-        mock_faiss.from_documents.assert_called_once_with(mock_documents, mock_embeddings_instance)
+        mock_faiss.from_documents.assert_called_once_with(
+            mock_documents, mock_embeddings_instance)
         mock_vectorstore.similarity_search.assert_called_once_with(query, k=2)
 
         # 验证返回结果
@@ -136,7 +141,11 @@ def test_retrieve_context_knowledge_with_real_files(setup_test_environment):
 @patch("mota.core.DirectoryLoader")
 @patch("mota.core.HuggingFaceEmbeddings")
 @patch("mota.core.FAISS")
-def test_retrieve_context_knowledge_integration(mock_faiss, mock_embeddings, mock_loader, setup_test_environment):
+def test_retrieve_context_knowledge_integration(
+        mock_faiss,
+        mock_embeddings,
+        mock_loader,
+        setup_test_environment):
     """测试知识库检索的集成功能"""
     knowledge_dir = setup_test_environment
 
@@ -150,7 +159,9 @@ def test_retrieve_context_knowledge_integration(mock_faiss, mock_embeddings, moc
     mock_embeddings.return_value = mock_embeddings_instance
 
     mock_vectorstore = MagicMock()
-    mock_retrieved_docs = [MagicMock(page_content=f"相关量子力学内容 {i}") for i in range(3)]
+    mock_retrieved_docs = [
+        MagicMock(
+            page_content=f"相关量子力学内容 {i}") for i in range(3)]
     mock_vectorstore.similarity_search.return_value = mock_retrieved_docs
     mock_faiss.from_documents.return_value = mock_vectorstore
 
@@ -173,9 +184,12 @@ def test_retrieve_context_knowledge_integration(mock_faiss, mock_embeddings, moc
 @patch("mota.seek.get_api_key")
 @patch("mota.seek.get_llm_call_func")
 @patch("mota.seek.get_parser_func")
-def test_main_with_rag_integration(mock_get_parser_func, mock_get_llm_call_func,
-                                   mock_get_api_key, mock_load_config,
-                                   mock_retrieve_context_knowledge):
+def test_main_with_rag_integration(
+        mock_get_parser_func,
+        mock_get_llm_call_func,
+        mock_get_api_key,
+        mock_load_config,
+        mock_retrieve_context_knowledge):
     """测试主函数中的知识库检索集成（RAG）功能"""
     from typer.testing import CliRunner
     from mota.main import cli
@@ -210,7 +224,8 @@ def test_main_with_rag_integration(mock_get_parser_func, mock_get_llm_call_func,
     mock_get_llm_call_func.return_value = mock_llm_call
 
     mock_parser = MagicMock()
-    mock_parser.return_value = {"content": "量子力学是研究原子和亚原子尺度现象的物理学分支，与相对论共同构成现代物理学的两大支柱。它通过概率和波函数描述微观粒子的行为，解释了经典物理学无法解释的现象，并在多个领域有广泛应用。"}
+    mock_parser.return_value = {
+        "content": "量子力学是研究原子和亚原子尺度现象的物理学分支，与相对论共同构成现代物理学的两大支柱。它通过概率和波函数描述微观粒子的行为，解释了经典物理学无法解释的现象，并在多个领域有广泛应用。"}
     mock_get_parser_func.return_value = mock_parser
 
     # 使用CliRunner调用主函数

@@ -38,12 +38,16 @@ from mota.custom_interface import LLMCallerInterface
 from groq.types.chat import ChatCompletion
 
 # Import the modules to be tested
-spec = importlib.util.spec_from_file_location("main_module", os.path.join(os.path.dirname(__file__), "../source/mota/main.py"))
+spec = importlib.util.spec_from_file_location(
+    "main_module", os.path.join(
+        os.path.dirname(__file__), "../source/mota/main.py"))
 main_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(main_module)
 
 # Import core module
-core_spec = importlib.util.spec_from_file_location("core_module", os.path.join(os.path.dirname(__file__), "../source/mota/core.py"))
+core_spec = importlib.util.spec_from_file_location(
+    "core_module", os.path.join(
+        os.path.dirname(__file__), "../source/mota/core.py"))
 core_module = importlib.util.module_from_spec(core_spec)
 core_spec.loader.exec_module(core_module)
 
@@ -95,8 +99,13 @@ class DummyLLMCaller(LLMCallerInterface):
 
             # 创建一个DummyLLMCaller类
             class DummyLLMCaller(LLMCallerInterface):
-                def call(self, provider: str, api_key: str, formatted_prompt: str,
-                         request_params: Dict[str, Any]) -> Union[Any, Generator]:
+                def call(self,
+                         provider: str,
+                         api_key: str,
+                         formatted_prompt: str,
+                         request_params: Dict[str,
+                                              Any]) -> Union[Any,
+                                                             Generator]:
                     return {"dummy_response": "This is a test response"}
 
             # 将DummyLLMCaller添加到模拟模块
@@ -107,7 +116,11 @@ class DummyLLMCaller(LLMCallerInterface):
             custom_func = core_module.get_llm_call_func(temp_module_path)
 
             # 调用函数并验证结果
-            result = custom_func("test_provider", "test_api_key", "test_prompt", {})
+            result = custom_func(
+                "test_provider",
+                "test_api_key",
+                "test_prompt",
+                {})
             assert result == {"dummy_response": "This is a test response"}
 
 
@@ -119,9 +132,8 @@ def test_custom_groq_api(stream_mode):
     """
     # 导入自定义 GROQ 模块
     groq_spec = importlib.util.spec_from_file_location(
-        "custom_groq",
-        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-    )
+        "custom_groq", os.path.join(
+            os.path.dirname(__file__), "../source/mota/custom_groq.py"))
     custom_groq = importlib.util.module_from_spec(groq_spec)
     groq_spec.loader.exec_module(custom_groq)
 
@@ -178,9 +190,8 @@ def test_custom_groq_api_without_user_message(stream_mode):
     """
     # 导入自定义 GROQ 模块
     groq_spec = importlib.util.spec_from_file_location(
-        "custom_groq",
-        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-    )
+        "custom_groq", os.path.join(
+            os.path.dirname(__file__), "../source/mota/custom_groq.py"))
     custom_groq = importlib.util.module_from_spec(groq_spec)
     groq_spec.loader.exec_module(custom_groq)
 
@@ -244,7 +255,10 @@ class MockStreamChunk:
             self.x_groq = None
 
 
-def create_mock_completion(content="this is test content", model="test-model", usage=None):
+def create_mock_completion(
+        content="this is test content",
+        model="test-model",
+        usage=None):
     # 创建基于ChatCompletion结构的MagicMock
     mock_response = MagicMock(spec=ChatCompletion)  # 关键点：spec约束
 
@@ -274,13 +288,16 @@ def test_parse_groq_response_non_stream():
     """测试解析非流式响应"""
     # 导入自定义 GROQ 模块
     groq_spec = importlib.util.spec_from_file_location(
-        "custom_groq",
-        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-    )
+        "custom_groq", os.path.join(
+            os.path.dirname(__file__), "../source/mota/custom_groq.py"))
     custom_groq = importlib.util.module_from_spec(groq_spec)
     groq_spec.loader.exec_module(custom_groq)
 
-    response = create_mock_completion(content="test content", model="test-model", usage={"total_tokens": 100})
+    response = create_mock_completion(
+        content="test content",
+        model="test-model",
+        usage={
+            "total_tokens": 100})
 
     # 使用类实例测试
     parser = custom_groq.GroqResponseParser()
@@ -295,9 +312,8 @@ def test_parse_groq_response_stream():
     """测试解析流式响应"""
     # 导入自定义 GROQ 模块
     groq_spec = importlib.util.spec_from_file_location(
-        "custom_groq",
-        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-    )
+        "custom_groq", os.path.join(
+            os.path.dirname(__file__), "../source/mota/custom_groq.py"))
     custom_groq = importlib.util.module_from_spec(groq_spec)
     groq_spec.loader.exec_module(custom_groq)
 
@@ -321,9 +337,8 @@ def test_parse_groq_response_error_handling(caplog):
     """测试异常处理"""
     # 导入自定义 GROQ 模块
     groq_spec = importlib.util.spec_from_file_location(
-        "custom_groq",
-        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-    )
+        "custom_groq", os.path.join(
+            os.path.dirname(__file__), "../source/mota/custom_groq.py"))
     custom_groq = importlib.util.module_from_spec(groq_spec)
     groq_spec.loader.exec_module(custom_groq)
 
@@ -345,16 +360,14 @@ def test_interface_implementation():
     """测试接口实现"""
     # 导入自定义 GROQ 模块和接口
     groq_spec = importlib.util.spec_from_file_location(
-        "custom_groq",
-        os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-    )
+        "custom_groq", os.path.join(
+            os.path.dirname(__file__), "../source/mota/custom_groq.py"))
     custom_groq = importlib.util.module_from_spec(groq_spec)
     groq_spec.loader.exec_module(custom_groq)
 
     interface_spec = importlib.util.spec_from_file_location(
-        "custom_interface",
-        os.path.join(os.path.dirname(__file__), "../source/mota/custom_interface.py")
-    )
+        "custom_interface", os.path.join(
+            os.path.dirname(__file__), "../source/mota/custom_interface.py"))
     custom_interface = importlib.util.module_from_spec(interface_spec)
     interface_spec.loader.exec_module(custom_interface)
 
@@ -402,9 +415,8 @@ def test_combined_llm_call_and_parser():
 
         # 导入自定义 GROQ 模块
         groq_spec = importlib.util.spec_from_file_location(
-            "custom_groq",
-            os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-        )
+            "custom_groq", os.path.join(
+                os.path.dirname(__file__), "../source/mota/custom_groq.py"))
         custom_groq = importlib.util.module_from_spec(groq_spec)
         groq_spec.loader.exec_module(custom_groq)
 
@@ -428,14 +440,12 @@ def test_combined_llm_call_and_parser():
             mock_load_module.return_value = custom_groq
 
             # 获取LLM调用函数
-            llm_call_func = main_module.get_llm_call_func(
-                os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-            )
+            llm_call_func = main_module.get_llm_call_func(os.path.join(
+                os.path.dirname(__file__), "../source/mota/custom_groq.py"))
 
             # 获取响应解析函数
-            parser_func = main_module.get_parser_func(
-                os.path.join(os.path.dirname(__file__), "../source/mota/custom_groq.py")
-            )
+            parser_func = main_module.get_parser_func(os.path.join(
+                os.path.dirname(__file__), "../source/mota/custom_groq.py"))
 
             # 测试参数
             provider = "groq"

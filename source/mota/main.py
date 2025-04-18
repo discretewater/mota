@@ -58,19 +58,27 @@ def main(
                                  show_envvar=False,
                                  flag_value=None),
     model: Optional[str] = typer.Option(None, help="模型名称", show_default=True),
-    prompt: str = typer.Option("万能的专家系统，我需要帮助。", help="系统提示词", show_default=True),
+    prompt: str = typer.Option(
+        "万能的专家系统，我需要帮助。",
+        help="系统提示词",
+        show_default=True),
     message: str = typer.Argument(..., help="用户消息 (必选参数)"),
     temperature: float = typer.Option(0.7, help="温度", show_default=True),
     stream: bool = typer.Option(True, help="启用流模式", show_default=True),
     config_path: Optional[str] = typer.Option(None, help="配置文件路径"),
     log_level: str = typer.Option("INFO", help="日志级别", show_default=True),
     log_output: str = typer.Option("stdout", help="日志输出目标", show_default=True),
-    custom_params: Optional[str] = typer.Option(None, help="自定义聊天请求参数，使用JSON格式"),
+    custom_params: Optional[str] = typer.Option(
+        None, help="自定义聊天请求参数，使用JSON格式"),
     fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔"),
-    custom_caller: Optional[Path] = typer.Option(None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
-    custom_parser: Optional[Path] = typer.Option(None, help="自定义响应解析函数路径，格式为 模块名:函数名", show_default=False),
-    knowledge_dir: Optional[str] = typer.Option(None, help="知识库目录路径，用于RAG检索增强生成", show_default=False),
-    user_query: Optional[List[str]] = typer.Argument(None, help="附加的用户查询，将会附加到主要用户消息后")
+    custom_caller: Optional[Path] = typer.Option(
+        None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
+    custom_parser: Optional[Path] = typer.Option(
+        None, help="自定义响应解析函数路径，格式为 模块名:函数名", show_default=False),
+    knowledge_dir: Optional[str] = typer.Option(
+        None, help="知识库目录路径，用于RAG检索增强生成", show_default=False),
+    user_query: Optional[List[str]] = typer.Argument(
+        None, help="附加的用户查询，将会附加到主要用户消息后")
 ) -> None:
     """
     程序入口点，与LLM进行对话

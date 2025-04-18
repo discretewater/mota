@@ -55,7 +55,10 @@ def test_get_api_key_authinfo():
     """测试从.authinfo文件获取API密钥"""
     mock_authinfo_content = "openai-api-key authinfo_key"
     with patch("builtins.open", mock_open(read_data=mock_authinfo_content)):
-        key = get_api_key("openai", auth_source="authinfo", auth_path="dummy_path")
+        key = get_api_key(
+            "openai",
+            auth_source="authinfo",
+            auth_path="dummy_path")
         assert key == "authinfo_key"
 
 
@@ -97,7 +100,10 @@ def test_parse_response():
             message = Message()
         choices = [Choice()]
         model = "test-model"
-        usage = type("Usage", (), {"_asdict": lambda self: {"total_tokens": 10}})()
+        usage = type(
+            "Usage", (), {
+                "_asdict": lambda self: {
+                    "total_tokens": 10}})()
 
     response = MockResponse()
     result = default_parse(response)
@@ -246,7 +252,10 @@ dummy_config = {
 @patch("mota.seek.load_config", return_value=dummy_config)
 @patch("mota.seek.get_api_key", return_value="dummy_api_key")
 @patch("openai.OpenAI")
-def test_main_openai_success(mock_openai_cls, mock_get_api_key, mock_load_config):
+def test_main_openai_success(
+        mock_openai_cls,
+        mock_get_api_key,
+        mock_load_config):
     """
     测试 main 函数在 openai 提供商下的成功执行。
     使用 mock 模拟 OpenAI API响应，并验证输出结果包含预期响应内容。
@@ -279,7 +288,10 @@ def test_main_openai_success(mock_openai_cls, mock_get_api_key, mock_load_config
 @patch("mota.seek.load_config", return_value=dummy_config)
 @patch("mota.seek.get_api_key", return_value="dummy_api_key")
 @patch("openai.OpenAI")
-def test_main_openai_custom_params(mock_openai_cls, mock_get_api_key, mock_load_config):
+def test_main_openai_custom_params(
+        mock_openai_cls,
+        mock_get_api_key,
+        mock_load_config):
     """
     测试 main 函数使用自定义请求参数执行，
     验证自定义参数是否正确合并到API请求中。
@@ -317,7 +329,10 @@ def test_main_openai_custom_params(mock_openai_cls, mock_get_api_key, mock_load_
 @patch("mota.seek.load_config", return_value=dummy_config)
 @patch("mota.seek.get_api_key", return_value="dummy_api_key")
 @patch("openai.OpenAI")
-def test_main_openai_field_extraction(mock_openai_cls, mock_get_api_key, mock_load_config):
+def test_main_openai_field_extraction(
+        mock_openai_cls,
+        mock_get_api_key,
+        mock_load_config):
     """
     测试 main 函数的字段提取功能，
     当使用 --fields 参数时，输出应只包含指定的字段。

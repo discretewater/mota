@@ -80,10 +80,10 @@ def find_implementor(module, interface: Type[ABC]) -> Type[ABC] | None:
         attr = getattr(module, attr_name)
         # 检查是否为类并且是 interface 的子类
         if (
-                isinstance(attr, type)
-                and issubclass(attr, interface)  # 是接口的子类
-                and attr is not interface  # 排除接口自身
-                and not getattr(attr, "__abstractmethods__", False)  # 排除抽象类
+            isinstance(attr, type)
+            and issubclass(attr, interface)  # 是接口的子类
+            and attr is not interface  # 排除接口自身
+            and not getattr(attr, "__abstractmethods__", False)  # 排除抽象类
         ):
             return attr
     return None

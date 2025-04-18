@@ -76,7 +76,8 @@ class AnthropicLLMCaller(LLMCallerInterface):
         user_message = request_params.get("message", "")
 
         # 记录 API 调用参数（不包括敏感信息）
-        logger.info(f"调用 Anthropic API，模型: {model}, 温度: {temperature}, 流模式: {stream}")
+        logger.info(f"调用 Anthropic API，模型: {model}, 温度: {
+                    temperature}, 流模式: {stream}")
 
         # 使用 Claude 消息 API
         try:
@@ -95,12 +96,14 @@ class AnthropicLLMCaller(LLMCallerInterface):
 
             # 使用旧版 Completion API
             return client.completion(
-                prompt=f"{anthropic.HUMAN_PROMPT} {user_message}\n\n{anthropic.AI_PROMPT}",
+                prompt=f"{
+                    anthropic.HUMAN_PROMPT} {user_message}\n\n{
+                    anthropic.AI_PROMPT}",
                 model=model,
                 temperature=temperature,
                 max_tokens_to_sample=max_tokens,
-                stop_sequences=[anthropic.HUMAN_PROMPT]
-            )
+                stop_sequences=[
+                    anthropic.HUMAN_PROMPT])
 
 
 class AnthropicResponseParser(ResponseParserInterface):
@@ -130,14 +133,20 @@ class AnthropicResponseParser(ResponseParserInterface):
         """
         try:
             # 处理流式响应
-            if hasattr(response, '__iter__') and not hasattr(response, 'content'):
+            if hasattr(
+                    response,
+                    '__iter__') and not hasattr(
+                    response,
+                    'content'):
                 full_content = ""
                 model = ""
                 usage = {}
 
                 for chunk in response:
                     # 处理新版 Messages API 的流式响应
-                    if hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text'):
+                    if hasattr(
+                            chunk, 'delta') and hasattr(
+                            chunk.delta, 'text'):
                         full_content += chunk.delta.text
                     # 处理旧版 Completion API 的流式响应
                     elif hasattr(chunk, 'completion'):
@@ -149,8 +158,15 @@ class AnthropicResponseParser(ResponseParserInterface):
 
                     # 累积 usage 统计信息
                     if hasattr(chunk, 'usage') and chunk.usage:
-                        usage_dict = chunk.usage._asdict() if hasattr(chunk.usage, '_asdict') else vars(chunk.usage)
-                        usage = {k: usage_dict.get(k, 0) + usage.get(k, 0) for k in set(usage_dict) | set(usage)}
+                        usage_dict = chunk.usage._asdict() if hasattr(
+                            chunk.usage, '_asdict') else vars(chunk.usage)
+                        usage = {
+                            k: usage_dict.get(
+                                k,
+                                0)
+                            + usage.get(
+                                k,
+                                0) for k in set(usage_dict) | set(usage)}
 
                 return {
                     'content': full_content,
@@ -161,7 +177,8 @@ class AnthropicResponseParser(ResponseParserInterface):
             elif hasattr(response, 'content'):
                 usage = {}
                 if hasattr(response, 'usage') and response.usage:
-                    usage = response.usage._asdict() if hasattr(response.usage, '_asdict') else vars(response.usage)
+                    usage = response.usage._asdict() if hasattr(
+                        response.usage, '_asdict') else vars(response.usage)
 
                 return {
                     'content': response.content,

@@ -36,22 +36,22 @@ from edn_format import Keyword
 
 
 def seek(
-    # 必选参数
-    provider: str = "openai",
-    model: Optional[str] = None,
-    prompt: str = "万能的专家系统，我需要帮助。",
-    message: str = "",
-    temperature: float = 0.7,
-    stream: bool = True,
-    config_path: Optional[str] = None,
-    log_level: str = "INFO",
-    log_output: str = "stdout",
-    custom_params: Optional[Dict[str, Any]] = None,
-    fields: Optional[List[str]] = None,
-    custom_caller: Optional[Path] = None,
-    custom_parser: Optional[Path] = None,
-    knowledge_dir: Optional[str] = None,
-    user_query: Optional[List[str]] = None
+        # 必选参数
+        provider: str = "openai",
+        model: Optional[str] = None,
+        prompt: str = "万能的专家系统，我需要帮助。",
+        message: str = "",
+        temperature: float = 0.7,
+        stream: bool = True,
+        config_path: Optional[str] = None,
+        log_level: str = "INFO",
+        log_output: str = "stdout",
+        custom_params: Optional[Dict[str, Any]] = None,
+        fields: Optional[List[str]] = None,
+        custom_caller: Optional[Path] = None,
+        custom_parser: Optional[Path] = None,
+        knowledge_dir: Optional[str] = None,
+        user_query: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Mota 核心 API 函数，提供与大语言模型交互的完整功能。
@@ -100,7 +100,8 @@ def seek(
         if user_query:
             logger.debug(f"检测到用户查询参数: {user_query}")
             # 将用户查询添加到用户消息后面
-            actual_user_message = f"{actual_user_message} {' '.join(user_query)}"
+            actual_user_message = f"{actual_user_message} {
+                ' '.join(user_query)}"
             logger.debug(f"合并后的用户消息: {actual_user_message}")
 
         # 加载配置
@@ -117,20 +118,28 @@ def seek(
         # 从配置文件获取基础参数，注意处理可能的空值引用
         try:
             # 获取模型名称
-            if Keyword('llm') in config and Keyword('providers') in config[Keyword('llm')] and Keyword(provider.lower()) in config[Keyword('llm')][Keyword('providers')] and Keyword('model') in config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())]:
-                request_params["model"] = config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())][Keyword('model')]
+            if Keyword('llm') in config and Keyword('providers') in config[Keyword('llm')] and Keyword(provider.lower()) in config[Keyword(
+                    'llm')][Keyword('providers')] and Keyword('model') in config[Keyword('llm')][Keyword('providers')][Keyword(provider.lower())]:
+                request_params["model"] = config[Keyword('llm')][Keyword(
+                    'providers')][Keyword(provider.lower())][Keyword('model')]
 
             # 获取温度参数
-            if Keyword('llm') in config and Keyword('temperature') in config[Keyword('llm')]:
-                request_params["temperature"] = config[Keyword('llm')][Keyword('temperature')]
+            if Keyword('llm') in config and Keyword(
+                    'temperature') in config[Keyword('llm')]:
+                request_params["temperature"] = config[Keyword(
+                    'llm')][Keyword('temperature')]
 
             # 获取流式响应设置
-            if Keyword('llm') in config and Keyword('stream') in config[Keyword('llm')]:
-                request_params["stream"] = config[Keyword('llm')][Keyword('stream')]
+            if Keyword('llm') in config and Keyword(
+                    'stream') in config[Keyword('llm')]:
+                request_params["stream"] = config[Keyword(
+                    'llm')][Keyword('stream')]
 
             # 获取最大令牌数
-            if Keyword('llm') in config and Keyword('max_tokens') in config[Keyword('llm')]:
-                request_params["max_tokens"] = config[Keyword('llm')][Keyword('max_tokens')]
+            if Keyword('llm') in config and Keyword(
+                    'max_tokens') in config[Keyword('llm')]:
+                request_params["max_tokens"] = config[Keyword(
+                    'llm')][Keyword('max_tokens')]
         except Exception as e:
             logger.warning(f"从配置文件获取参数时出现异常: {e}，将使用默认值")
 
@@ -165,7 +174,8 @@ def seek(
             query = f"{prompt} {actual_user_message}"
             # 调用RAG检索函数获取相关上下文
             try:
-                context_knowledge = retrieve_context_knowledge(knowledge_dir, query)
+                context_knowledge = retrieve_context_knowledge(
+                    knowledge_dir, query)
                 # 将检索到的上下文合并为一个字符串
                 context_text = "\n\n".join(context_knowledge)
                 # 将上下文添加到提示词中
@@ -183,7 +193,11 @@ def seek(
 
         # 调用 LLM API 的统一接口函数，根据配置参数和自定义函数实现调用逻辑
         llm_call_func = get_llm_call_func(custom_caller)
-        response = llm_call_func(provider, api_key, formatted_prompt, request_params)
+        response = llm_call_func(
+            provider,
+            api_key,
+            formatted_prompt,
+            request_params)
 
         logger.debug(f"API响应: {response}")
 
@@ -195,7 +209,8 @@ def seek(
 
         # 提取指定字段
         if fields:
-            field_list = fields if isinstance(fields, list) else fields.split(',')
+            field_list = fields if isinstance(
+                fields, list) else fields.split(',')
             extracted = extract_fields(parsed_response, field_list)
             return extracted
         else:
