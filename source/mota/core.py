@@ -32,7 +32,8 @@ import gnupg  # 用于处理加密的 .authinfo.gpg
 
 # 导入 LangChain 相关模块
 from langchain_community.document_loaders import DirectoryLoader  # 用于递归加载目录下的各种文档格式
-from langchain_huggingface import HuggingFaceEmbeddings  # 向量化嵌入模型，HuggingFaceEmbeddings通用性较好
+# 向量化嵌入模型，HuggingFaceEmbeddings通用性较好
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS  # 使用 FAISS 构建向量索引以便于高效检索
 
 from mota.custom_interface import LLMCallerInterface, ResponseParserInterface
@@ -143,7 +144,15 @@ def get_api_key(provider: str,
     # 从配置文件获取
     if auth_source == "config":
         config = load_config()
-        return config.get('llm', {}).get('providers', {}).get(provider.lower(), {}).get('api_key', '')
+        return config.get(
+            'llm',
+            {}).get(
+            'providers',
+            {}).get(
+            provider.lower(),
+            {}).get(
+                'api_key',
+            '')
 
     raise ValueError(f"无法找到 {provider} 的API密钥")
 
@@ -183,14 +192,19 @@ def default_parse(response: Any) -> Dict[str, Any]:
     # 默认解析逻辑
     try:
         # 处理 OpenAI 流式响应
-        if hasattr(response, '__iter__') and not hasattr(response, 'choices'):  # 检查是否为流式响应
+        if hasattr(
+                response,
+                '__iter__') and not hasattr(
+                response,
+                'choices'):  # 检查是否为流式响应
             full_content = ""
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
                     full_content += chunk.choices[0].delta.content
             return {
                 'content': full_content,
-                'model': response.model if hasattr(response, 'model') else None,  # 流式响应可能无 model 属性
+                # 流式响应可能无 model 属性
+                'model': response.model if hasattr(response, 'model') else None,
                 'usage': response.usage._asdict() if hasattr(response, 'usage') else {}
             }
         # 处理 OpenAI 非流式响应
@@ -198,8 +212,9 @@ def default_parse(response: Any) -> Dict[str, Any]:
             return {
                 'content': response.choices[0].message.content,
                 'model': response.model,
-                'usage': response.usage._asdict() if hasattr(response, 'usage') else {}
-            }
+                'usage': response.usage._asdict() if hasattr(
+                    response,
+                    'usage') else {}}
     except Exception as e:
         logger.error(f"解析响应失败: {e}")
         raise
@@ -226,7 +241,11 @@ def extract_fields(response_dict: Dict[str, Any],
     return extracted
 
 
-def default_llm_call(provider: str, api_key: str, formatted_prompt: str, request_params: Dict[str, Any]) -> Any:
+def default_llm_call(provider: str,
+                     api_key: str,
+                     formatted_prompt: str,
+                     request_params: Dict[str,
+                                          Any]) -> Any:
     """
     默认的 LLM API 调用函数，根据提供商名称调用相应的 LLM API.
 
@@ -300,6 +319,7 @@ def load_custom_func(
     """
     try:
         module = load_module_from_path(module_name, module_path)
+        logger.debug(f"模块内容: {dir(module)}")  # 打印模块所有属性
         implementor_class = find_implementor(module, interface_class)
         if implementor_class is None:
             logger.error(f"错误：在提供的模块中未找到“{interface_class.__name__}”的实现类。")
@@ -380,7 +400,10 @@ def get_parser_func(custom_parser: Optional[Path]) -> Callable:
         return default_parse
 
 
-def retrieve_context_knowledge(directory_path: str, query: str, top_k: int = 5) -> List[str]:
+def retrieve_context_knowledge(
+        directory_path: str,
+        query: str,
+        top_k: int = 5) -> List[str]:
     """
     从指定目录递归加载文档，并基于问题描述检索出相关的上下文文本。
 
@@ -415,7 +438,8 @@ def retrieve_context_knowledge(directory_path: str, query: str, top_k: int = 5) 
 
     # 2. 初始化嵌入模型
     # 使用HuggingFaceEmbeddings的嵌入模型进行向量化
-    embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")  # "all-MiniLM-L6-v2"（小）和"all-mpnet-base-v2"（大）
+    # "all-MiniLM-L6-v2"（小）和"all-mpnet-base-v2"（大）
+    embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
 
     # 3. 构建向量存储索引（FAISS）
     # FAISS.from_documents 会对每个文档调用嵌入模型，将文档转换为向量，并建立索引以支持快速检索
