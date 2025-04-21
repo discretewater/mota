@@ -34,7 +34,7 @@ import typer
 # 从core模块导入所有核心功能
 from mota.core import (  # noqa: F401
     get_llm_call_func, get_parser_func,
-    logger
+    logger, JsonDict
 )
 
 
@@ -69,7 +69,7 @@ def main(
     log_level: str = typer.Option("INFO", help="日志级别", show_default=True),
     log_output: str = typer.Option("stdout", help="日志输出目标", show_default=True),
     custom_params: Optional[str] = typer.Option(
-        None, help="自定义聊天请求参数，使用JSON格式"),
+        None, parser=JsonDict.parse_json, help="自定义聊天请求参数，使用JSON格式"),
     fields: Optional[str] = typer.Option(None, help="需要提取的响应字段，使用逗号分隔"),
     custom_caller: Optional[Path] = typer.Option(
         None, help="用户自定义 LLM API 调用函数的模块路径，格式为 module:function", show_default=False),
@@ -84,12 +84,6 @@ def main(
     程序入口点，与LLM进行对话
     """
     try:
-        # 解析自定义参数
-        custom_params_dict = None
-        if custom_params:
-            import json
-            custom_params_dict = json.loads(custom_params)
-
         # 调用核心API函数
         from mota.seek import seek
         result = seek(
@@ -102,7 +96,7 @@ def main(
             config_path=config_path,
             log_level=log_level,
             log_output=log_output,
-            custom_params=custom_params_dict,
+            custom_params=custom_params,
             fields=fields.split(',') if fields else None,
             custom_caller=custom_caller,
             custom_parser=custom_parser,

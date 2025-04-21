@@ -24,11 +24,12 @@ core.py - Mota核心功能模块
 import os
 import sys
 import logging
-import typing
 from typing import Optional, Dict, Any, Callable, List
 import edn_format
 from pathlib import Path
 import gnupg  # 用于处理加密的 .authinfo.gpg
+import json
+import typer
 
 # 导入 LangChain 相关模块
 from langchain_community.document_loaders import DirectoryLoader  # 用于递归加载目录下的各种文档格式
@@ -45,6 +46,51 @@ logger = logging.getLogger(__name__)
 
 # 定义 OpenAI 客户端（仅在需要时初始化）
 openai_client = None
+
+
+class JsonDict:
+    """
+    自定义类型，用于将 JSON 格式的字符串解析为 Python 字典。
+
+    该类通过静态方法实现 JSON 字符串的解析，支持空值处理和错误捕获。
+    主要用于 Typer 命令行参数的类型转换，确保输入的 JSON 字符串能够正确转换为字典对象。
+    """
+
+    @staticmethod
+    def __get_validators__():
+        """
+        为 Typer 的类型系统提供验证器。
+
+        Yields:
+            Callable: 返回解析 JSON 的静态方法 `parse_json`。
+        """
+        yield JsonDict.parse_json
+
+    @staticmethod
+    def parse_json(value: Optional[str]) -> Optional[Dict]:
+        """
+        将 JSON 格式的字符串解析为 Python 字典。
+
+        Args:
+            value (Optional[str]): 输入的 JSON 字符串，可能为 None。
+
+        Returns:
+            Optional[Dict]: 解析后的字典对象，如果输入为 None 则返回 None。
+
+        Raises:
+            typer.BadParameter: 如果输入的 JSON 字符串格式无效，抛出异常并附带错误信息。
+        """
+        if value is None:
+            return None
+        try:
+            # 尝试解析 JSON 字符串为字典
+            return json.loads(value)
+        except json.JSONDecodeError as e:
+            # 捕获 JSON 解析错误，抛出用户友好的错误信息
+            raise typer.BadParameter(f"无效的 JSON 格式: {e}")
+        except TypeError as e:
+            # 捕获类型错误，例如输入非字符串类型
+            raise typer.BadParameter(f"输入类型错误: {e}")
 
 
 def setup_logging(level: str = "INFO", output: str = "stdout") -> None:
@@ -221,7 +267,7 @@ def default_parse(response: Any) -> Dict[str, Any]:
 
 
 def extract_fields(response_dict: Dict[str, Any],
-                   fields: typing.List[str]) -> Dict[str, Any]:
+                   fields: List[str]) -> Dict[str, Any]:
     """
     从响应字典中提取指定字段
 
