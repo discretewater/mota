@@ -10,10 +10,10 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "GPL-3.0-or-later" }
 authors = [
-    {name = "KEJIA", email = "master@renai.com"},
+    {name = "KEJIA", email = "DETONG.KEJI@GMAIL.COM"},
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
@@ -58,8 +58,8 @@ testpaths = ["test"]
 python_files = ["test_*.py"]
 
 [project.urls]
-Repository = "https://github.com/username/mota"
-Documentation = "https://mota.readthedocs.io"
+Repository = "https://codeberg.org/wizardelf/mota"
+Documentation = "https://codeberg.org/wizardelf/mota/src/branch/ling/README.md"
 
 [tool.setuptools.packages.find]
 where = ["source"]
