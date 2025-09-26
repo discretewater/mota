@@ -43,7 +43,7 @@ pip install mota
 
 ### 从源码安装（开发模式）
 ```bash
-git clone https://github.com/username/mota.git
+git clone https://codeberg.org/WIZARDELF/mota.git
 cd mota
 pip install -e .
 ```
@@ -243,4 +243,4 @@ MOTA_DEV=1 mota --log-level DEBUG ...
 ```
 
 ## 许可证
-本项目采用 GNU 通用公共许可证 v3.0 (GPL-3.0-or-later)，保留对代码进行商业使用的限制。
+本项目采用GNU通用公共许可证 v3.0 (GPL-3.0-or-later)，保留对代码进行商业使用的限制。
