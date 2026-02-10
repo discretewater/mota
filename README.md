@@ -1,6 +1,8 @@
-# Mota
+# MOTA
 
-Mota is a comprehensive tool for interacting with various major Large Language Model (LLM) API services. It supports multiple LLM providers, including OpenAI, Anthropic, GROQ, and others, through a plugin-based architecture. It also provides unified configuration management, authentication handling, and an extensible API interaction interface.
+[![PyPI version](https://badge.fury.io/py/mota.svg)](https://pypi.org/project/mota/)
+
+MOTA is a comprehensive tool for interacting with various major Large Language Model (LLM) API services. It supports multiple LLM providers, including OpenAI, Anthropic, GROQ, and others, through a plugin-based architecture. It also provides unified configuration management, authentication handling, and an extensible API interaction interface.
 
 ## Features
 
